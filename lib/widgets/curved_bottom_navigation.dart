@@ -20,12 +20,12 @@ class CurvedBottomNavigation extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: SoftSurfaceCard(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        borderRadius: BorderRadius.circular(34),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        borderRadius: BorderRadius.circular(30),
         highlightAlignment: Alignment.topCenter,
-        highlightRadius: 1.2,
+        highlightRadius: 1.05,
         backgroundColor: AppColors.backgroundWhite.withValues(alpha: 0.9),
         child: Row(
           children: [
@@ -68,20 +68,30 @@ class _NavItem extends StatelessWidget {
         selected: selected,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(24),
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
+            padding: const EdgeInsets.symmetric(vertical: 2),
             child: Container(
               width: double.infinity,
-              height: 56,
+              height: 54,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: selected
-                    ? AppColors.emerald.withValues(alpha: 0.95)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(22),
+                gradient: selected
+                    ? const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [AppColors.emerald, AppColors.emeraldDeep],
+                      )
+                    : null,
+                color: selected ? null : Colors.transparent,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: selected
+                      ? Colors.transparent
+                      : AppColors.border.withValues(alpha: 0.62),
+                ),
               ),
-              child: Icon(icon, color: color, size: 28),
+              child: Icon(icon, color: color, size: 26),
             ),
           ),
         ),

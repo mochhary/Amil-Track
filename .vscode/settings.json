@@ -1,5 +1,17 @@
 {
   "chat.tools.terminal.autoApprove": {
-    "flutter": true
+    "flutter": true,
+    "/^cd /Users/hary/Documents/development/amil_track && python3 - <<'PY'\ntry:\n    from PIL import Image\n    print\\('PIL_OK'\\)\nexcept Exception as exc:\n    print\\('PIL_FAIL', exc\\)\nPY\n$/": {
+      "approve": true,
+      "matchCommandLine": true
+    },
+    "/^cd /Users/hary/Documents/development/amil_track && python3 - <<'PY'\nfrom PIL import Image\ntry:\n    img = Image\\.open\\('assets/images/logo_amil_track\\.png'\\)\n    print\\(img\\.size\\)\nexcept Exception as e:\n    print\\(e\\)\nPY\n$/": {
+      "approve": true,
+      "matchCommandLine": true
+    },
+    "/^cd /Users/hary/Documents/development/amil_track && python3 - <<'PY'\nfrom pathlib import Path\nfrom PIL import Image, ImageChops, ImageOps\n\nroot = Path\\('/Users/hary/Documents/development/amil_track'\\)\nsource_path = root / 'assets/images/logo_amil_track\\.png'\nsource = Image\\.open\\(source_path\\)\\.convert\\('RGBA'\\)\n\n# Auto-trim the near-uniform background so the logo fills the launcher icon better\\.\nbackground = Image\\.new\\('RGBA', source\\.size, source\\.getpixel\\(\\(0, 0\\)\\)\\)\ndiff = ImageChops\\.difference\\(source, background\\)\nbbox = diff\\.getbbox\\(\\) or \\(0, 0, source\\.width, source\\.height\\)\ntrimmed = source\\.crop\\(bbox\\)\n\ncream = \\(246, 245, 239, 255\\)\n\ndef make_icon\\(size: int\\) -> Image\\.Image:\n    canvas = Image\\.new\\('RGBA', \\(size, size\\), cream\\)\n    target = int\\(size \\* 0\\.84\\)\n    scaled = ImageOps\\.contain\\(trimmed, \\(target, target\\), Image\\.Resampling\\.LANCZOS\\)\n    x = \\(size - scaled\\.width\\) // 2\n    y = \\(size - scaled\\.height\\) // 2\n    canvas\\.alpha_composite\\(scaled, \\(x, y\\)\\)\n    return canvas\n\n# Android launcher icons\\.\nandroid_sizes = \\{\n    root / 'android/app/src/main/res/mipmap-mdpi/ic_launcher\\.png': 48,\n    root / 'android/app/src/main/res/mipmap-hdpi/ic_launcher\\.png': 72,\n    root / 'android/app/src/main/res/mipmap-xhdpi/ic_launcher\\.png': 96,\n    root / 'android/app/src/main/res/mipmap-xxhdpi/ic_launcher\\.png': 144,\n    root / 'android/app/src/main/res/mipmap-xxxhdpi/ic_launcher\\.png': 192,\n\\}\nfor output, size in android_sizes\\.items\\(\\):\n    output\\.parent\\.mkdir\\(parents=True, exist_ok=True\\)\n    make_icon\\(size\\)\\.save\\(output\\)\n\n# iOS AppIcon set\\.\nios_outputs = \\{\n    'Icon-App-20x20@1x\\.png': 20,\n    'Icon-App-20x20@2x\\.png': 40,\n    'Icon-App-20x20@3x\\.png': 60,\n    'Icon-App-29x29@1x\\.png': 29,\n    'Icon-App-29x29@2x\\.png': 58,\n    'Icon-App-29x29@3x\\.png': 87,\n    'Icon-App-40x40@1x\\.png': 40,\n    'Icon-App-40x40@2x\\.png': 80,\n    'Icon-App-40x40@3x\\.png': 120,\n    'Icon-App-60x60@2x\\.png': 120,\n    'Icon-App-60x60@3x\\.png': 180,\n    'Icon-App-76x76@1x\\.png': 76,\n    'Icon-App-76x76@2x\\.png': 152,\n    'Icon-App-83\\.5x83\\.5@2x\\.png': 167,\n    'Icon-App-1024x1024@1x\\.png': 1024,\n\\}\nios_dir = root / 'ios/Runner/Assets\\.xcassets/AppIcon\\.appiconset'\nios_dir\\.mkdir\\(parents=True, exist_ok=True\\)\nfor filename, size in ios_outputs\\.items\\(\\):\n    make_icon\\(size\\)\\.save\\(ios_dir / filename\\)\n\nprint\\('Generated launcher icons from', source_path\\)\nPY\n$/": {
+      "approve": true,
+      "matchCommandLine": true
+    }
   }
 }

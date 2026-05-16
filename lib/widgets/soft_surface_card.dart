@@ -9,7 +9,7 @@ class SoftSurfaceCard extends StatelessWidget {
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(AppSpacing.lg),
-    this.borderRadius = const BorderRadius.all(Radius.circular(28)),
+    this.borderRadius = const BorderRadius.all(Radius.circular(30)),
     this.margin = EdgeInsets.zero,
     this.backgroundColor = Colors.white,
     this.borderColor = AppColors.border,
@@ -38,21 +38,19 @@ class SoftSurfaceCard extends StatelessWidget {
       margin: margin,
       padding: padding,
       decoration: BoxDecoration(
-        color: glass
-            ? backgroundColor.withValues(alpha: 0.97)
-            : backgroundColor,
+        color: glass ? backgroundColor.withValues(alpha: 0.8) : backgroundColor,
         borderRadius: borderRadius,
-        border: Border.all(color: borderColor.withValues(alpha: 0.92)),
+        border: Border.all(color: borderColor.withValues(alpha: 0.72)),
         boxShadow: [
           BoxShadow(
-            color: shadowColor,
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+            color: shadowColor.withValues(alpha: 0.08),
+            blurRadius: 32,
+            offset: const Offset(0, 16),
           ),
           BoxShadow(
-            color: AppColors.shadowLight.withValues(alpha: 0.32),
-            blurRadius: 10,
-            offset: const Offset(-4, -4),
+            color: AppColors.shadowLight.withValues(alpha: 0.22),
+            blurRadius: 16,
+            offset: const Offset(-3, -3),
           ),
         ],
       ),
@@ -67,7 +65,7 @@ class SoftSurfaceCard extends StatelessWidget {
                     center: highlightAlignment,
                     radius: highlightRadius,
                     colors: [
-                      Colors.white.withValues(alpha: highlightOpacity),
+                      Colors.white.withValues(alpha: highlightOpacity * 0.78),
                       backgroundColor.withValues(alpha: 0),
                     ],
                   ),
@@ -86,12 +84,12 @@ class SoftSurfaceCard extends StatelessWidget {
 
     final clipRadius = borderRadius is BorderRadius
         ? borderRadius as BorderRadius
-        : const BorderRadius.all(Radius.circular(28));
+        : const BorderRadius.all(Radius.circular(30));
 
     return ClipRRect(
       borderRadius: clipRadius,
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
         child: decoratedChild,
       ),
     );

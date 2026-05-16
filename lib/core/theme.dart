@@ -78,14 +78,15 @@ class AppTheme {
         displayColor: AppColors.textPrimary,
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: AppColors.backgroundWhite,
-        foregroundColor: AppColors.textPrimary,
-        centerTitle: true,
+        backgroundColor: Colors.transparent,
+        foregroundColor: AppColors.emeraldDeep,
+        centerTitle: false,
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         titleTextStyle: textTheme.titleLarge?.copyWith(
           color: AppColors.emeraldDeep,
+          fontWeight: FontWeight.w800,
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -107,7 +108,7 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.emerald,
+          foregroundColor: AppColors.emeraldDeep,
           textStyle: textTheme.labelLarge,
           side: const BorderSide(color: AppColors.border),
           padding: const EdgeInsets.symmetric(
@@ -117,7 +118,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(999),
           ),
-          backgroundColor: AppColors.backgroundWhite,
+          backgroundColor: AppColors.backgroundWhite.withValues(alpha: 0.72),
           elevation: 0,
         ),
       ),
@@ -129,7 +130,7 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.softSurface,
+        fillColor: AppColors.backgroundWhite.withValues(alpha: 0.82),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.md,
           vertical: AppSpacing.md + 2,
@@ -154,25 +155,25 @@ class AppTheme {
         ),
       ),
       cardTheme: CardThemeData(
-        color: AppColors.backgroundWhite,
+        color: AppColors.backgroundWhite.withValues(alpha: 0.8),
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.circular(30),
           side: const BorderSide(color: AppColors.border),
         ),
         margin: EdgeInsets.zero,
         shadowColor: AppColors.shadowDark,
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: AppColors.backgroundWhite,
+        backgroundColor: AppColors.backgroundWhite.withValues(alpha: 0.86),
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
       ),
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: AppColors.backgroundWhite,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
         ),
       ),
       dividerTheme: const DividerThemeData(
@@ -180,7 +181,7 @@ class AppTheme {
         thickness: 1,
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-        backgroundColor: AppColors.backgroundWhite,
+        backgroundColor: Colors.transparent,
         selectedItemColor: AppColors.emerald,
         unselectedItemColor: AppColors.textSecondary,
         elevation: 0,
