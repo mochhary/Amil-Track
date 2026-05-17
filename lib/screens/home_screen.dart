@@ -1,19 +1,113 @@
+import 'dart:io';
+import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/constants.dart';
-import '../widgets/curved_bottom_navigation.dart';
 import '../widgets/loading_states.dart';
 import '../widgets/soft_surface_card.dart';
+import '../widgets/app_watermark_background.dart';
+import '../widgets/glass_container.dart';
 import 'transaction_form.dart';
 import 'transaction_list.dart';
 import '../services/auth_service.dart';
-import '../services/supabase_service.dart';
+import '../services/sqlite_service.dart';
+import '../services/sync_service.dart';
 
+// ============================================================================
+// DATA MODEL GLOBAL & GLOBAL HELPER
+// ============================================================================
+class _DashboardData {
+  final double totalUang;
+  final double totalBeras;
+  final int countFitrah;
+  final int countProfesi;
+  final int countMaal;
+  final int todayMuzakki;
+  final double todayUang;
+  final List<Map<String, dynamic>> recentTransactions;
+
+  const _DashboardData({
+    this.totalUang = 0,
+    this.totalBeras = 0,
+    this.countFitrah = 0,
+    this.countProfesi = 0,
+    this.countMaal = 0,
+    this.todayMuzakki = 0,
+    this.todayUang = 0,
+    this.recentTransactions = const [],
+  });
+}
+
+Future<void> _launchWithConfirmation(
+  BuildContext context,
+  String urlString,
+  String title,
+  String message,
+) async {
+  final bool? confirm = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      backgroundColor: Colors.white.withValues(alpha: 0.95),
+      title: Text(
+        title,
+        style: const TextStyle(
+          fontWeight: FontWeight.w900,
+          color: AppColors.emeraldDeep,
+          fontSize: 18,
+        ),
+      ),
+      content: Text(
+        message,
+        style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text(
+            'Batal',
+            style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+          ),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.emerald,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            elevation: 0,
+          ),
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text(
+            'Ya, Lanjutkan',
+            style: TextStyle(fontWeight: FontWeight.w900),
+          ),
+        ),
+      ],
+    ),
+  );
+  if (confirm == true) {
+    final Uri url = Uri.parse(urlString);
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      if (context.mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Gagal membuka tautan eksternal.')),
+        );
+    }
+  }
+}
+
+// ============================================================================
+// MAIN SCREEN
+// ============================================================================
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.username});
-
   final String username;
-
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -21,175 +115,653 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late Future<_DashboardData> _dashboardFuture;
   int _selectedTab = 0;
+  bool _isOnline = true;
+  bool _wasOffline = false;
+  Timer? _networkTimer;
 
   @override
   void initState() {
     super.initState();
     _dashboardFuture = _loadDashboardData();
+    _checkNetwork();
+    _networkTimer = Timer.periodic(
+      const Duration(seconds: 4),
+      (_) => _checkNetwork(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _networkTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _checkNetwork() async {
+    bool previousState = _isOnline;
+    try {
+      final result = await InternetAddress.lookup('google.com');
+      _isOnline = result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+    } on SocketException catch (_) {
+      _isOnline = false;
+    }
+    if (previousState != _isOnline && mounted) {
+      setState(() {});
+      if (_isOnline) {
+        SyncService.instance.syncPendingData();
+        _wasOffline = true;
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted) setState(() => _wasOffline = false);
+        });
+      }
+    }
   }
 
   void _refreshDashboard() {
     setState(() {
       _dashboardFuture = _loadDashboardData();
     });
+    SyncService.instance.syncPendingData();
   }
 
   Future<_DashboardData> _loadDashboardData() async {
-    final rates = await SupabaseService.instance.getCurrentZakatRates();
-    final totals = await SupabaseService.instance.fetchCollectedTotalsByType();
+    final db = await SqliteService.instance.database;
+    final uangRes = await db.rawQuery(
+      'SELECT SUM(${SqliteService.columnJumlah}) as total FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnTipeSatuan} = "uang"',
+    );
+    final berasRes = await db.rawQuery(
+      'SELECT SUM(${SqliteService.columnJumlah}) as total FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnTipeSatuan} = "beras"',
+    );
+
+    final fitrahRes = await db.rawQuery(
+      'SELECT COUNT(*) as c FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnKategoriZakat} = "Fitrah"',
+    );
+    final profesiRes = await db.rawQuery(
+      'SELECT COUNT(*) as c FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnKategoriZakat} = "Profesi"',
+    );
+    final maalRes = await db.rawQuery(
+      'SELECT COUNT(*) as c FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnKategoriZakat} = "Maal"',
+    );
+
+    final todayStr = DateTime.now().toIso8601String().substring(0, 10);
+    final todayRes = await db.rawQuery(
+      "SELECT COUNT(*) as c FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnCreatedAt} LIKE '$todayStr%'",
+    );
+    final todayUangRes = await db.rawQuery(
+      "SELECT SUM(${SqliteService.columnJumlah}) as total FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnTipeSatuan} = 'uang' AND ${SqliteService.columnCreatedAt} LIKE '$todayStr%'",
+    );
+    final recentTxs = await db.query(
+      SqliteService.tableTransactions,
+      orderBy: '${SqliteService.columnCreatedAt} DESC',
+      limit: 4,
+    );
 
     return _DashboardData(
-      zakatUangRate: rates[SupabaseService.zakatUangSettingKey],
-      zakatBerasRate: rates[SupabaseService.zakatBerasSettingKey],
-      totalUang: totals['uang'] ?? 0,
-      totalBeras: totals['beras'] ?? 0,
+      totalUang: (uangRes.first['total'] as num?)?.toDouble() ?? 0.0,
+      totalBeras: (berasRes.first['total'] as num?)?.toDouble() ?? 0.0,
+      countFitrah: fitrahRes.first['c'] as int? ?? 0,
+      countProfesi: profesiRes.first['c'] as int? ?? 0,
+      countMaal: maalRes.first['c'] as int? ?? 0,
+      todayMuzakki: todayRes.first['c'] as int? ?? 0,
+      todayUang: (todayUangRes.first['total'] as num?)?.toDouble() ?? 0.0,
+      recentTransactions: recentTxs,
     );
   }
 
-  Future<void> _openSettingsDialog(_DashboardData currentData) async {
-    final result = await showDialog<bool>(
-      context: context,
-      barrierDismissible: true,
-      builder: (dialogContext) => _NisabDialog(
-        initialUang: currentData.zakatUangRate,
-        initialBeras: currentData.zakatBerasRate,
+  Widget _buildClassicNavItem({
+    required IconData icon,
+    required String label,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              color: isActive ? AppColors.emeraldDeep : Colors.grey.shade500,
+              size: 26,
+            ),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
+                color: isActive ? AppColors.emeraldDeep : Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(height: 2),
+            AnimatedOpacity(
+              duration: const Duration(milliseconds: 200),
+              opacity: isActive ? 1.0 : 0.0,
+              child: Container(
+                width: 4,
+                height: 4,
+                decoration: const BoxDecoration(
+                  color: AppColors.emeraldDeep,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
-
-    if (!mounted) return;
-
-    if (result == true) {
-      setState(() {
-        _dashboardFuture = _loadDashboardData();
-      });
-    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final user = AuthService.instance.currentUser;
-    final username = widget.username;
+    final topPadding = MediaQuery.of(context).padding.top;
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
 
-    return Scaffold(
-      backgroundColor: AppColors.backgroundWhite,
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: Text(_selectedTab == 0 ? 'Amil Track' : 'Profil'),
-        actions: [
-          if (_selectedTab == 0)
-            IconButton(
-              icon: const Icon(Icons.history_rounded),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const TransactionListScreen(),
-                  ),
-                );
-              },
-            ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      floatingActionButton: Container(
-        height: 72,
-        width: 72,
-        margin: const EdgeInsets.only(top: 24),
-        child: FloatingActionButton(
-          elevation: 4,
-          backgroundColor: AppColors.orangeGold,
-          foregroundColor: AppColors.backgroundWhite,
-          shape: const CircleBorder(),
-          onPressed: () async {
-            final result = await Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const TransactionFormScreen()),
-            );
-            if (result == true) {
-              _refreshDashboard();
-            }
-          },
-          child: const Icon(Icons.add_rounded, size: 36),
-        ),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      bottomNavigationBar: BottomAppBar(
-        padding: EdgeInsets.zero,
-        notchMargin: 8,
-        color: Colors.transparent,
-        elevation: 0,
-        child: SizedBox(
-          height: 64,
-          child: CurvedBottomNavigation(
-            isHomeActive: _selectedTab == 0,
-            isProfileActive: _selectedTab == 1,
-            onHomeTap: () => setState(() => _selectedTab = 0),
-            onProfileTap: () => setState(() => _selectedTab = 1),
-          ),
-        ),
-      ),
-      body: IndexedStack(
-        index: _selectedTab,
-        children: [
-          FutureBuilder<_DashboardData>(
-            future: _dashboardFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const SkeletonDashboard();
-              }
+    return AppWatermarkBackground(
+      child: Scaffold(
+        extendBody: true,
+        backgroundColor: Colors.transparent,
+        body: FutureBuilder<_DashboardData>(
+          future: _dashboardFuture,
+          builder: (context, snapshot) {
+            final data = snapshot.data ?? const _DashboardData();
 
-              final data = snapshot.data ?? const _DashboardData();
-
-              return ListView(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.lg,
-                  AppSpacing.lg,
-                  AppSpacing.lg,
-                  110,
-                ),
-                children: [
-                  _GreetingHeader(username: username),
-                  const SizedBox(height: AppSpacing.lg),
-                  _RateCard(
-                    zakatUangRate: data.zakatUangRate,
-                    zakatBerasRate: data.zakatBerasRate,
-                    onEditPressed: () => _openSettingsDialog(data),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  Row(
+            return Stack(
+              children: [
+                // LAYER 1: KONTEN UTAMA APPLICATION
+                Positioned.fill(
+                  child: IndexedStack(
+                    index: _selectedTab,
                     children: [
-                      Expanded(
-                        child: _SummaryCard(
-                          title: 'Total Uang',
-                          value: SupabaseService.instance.formatCurrency(
-                            data.totalUang,
+                      RefreshIndicator(
+                        onRefresh: () async => _refreshDashboard(),
+                        color: AppColors.emerald,
+                        edgeOffset: topPadding + 80,
+                        child: ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: EdgeInsets.fromLTRB(
+                            20,
+                            topPadding + 90,
+                            20,
+                            140 + bottomPadding,
                           ),
-                          icon: Icons.account_balance_wallet_rounded,
-                          accentColor: AppColors.orangeGold,
+                          children: [
+                            _HeroDashboardCard(
+                                  username: widget.username,
+                                  totalUang: data.totalUang,
+                                  totalBeras: data.totalBeras,
+                                  todayCount: data.todayMuzakki,
+                                )
+                                .animate()
+                                .fade(duration: 400.ms)
+                                .slideY(begin: 0.05),
+                            const SizedBox(height: 24),
+                            const Text(
+                              'Peralatan Amil',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 16,
+                                color: AppColors.emeraldDeep,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            _ActionGrid(
+                              todayMuzakki: data.todayMuzakki,
+                              todayUang: data.todayUang,
+                            ),
+                            const SizedBox(height: 24),
+                            _DistributionMiniChart(
+                              fitrah: data.countFitrah,
+                              profesi: data.countProfesi,
+                              maal: data.countMaal,
+                            ),
+                            const SizedBox(height: 24),
+                            _ActivityFeed(
+                              transactions: data.recentTransactions,
+                              onSeeAll: () async {
+                                await Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const TransactionListScreen(),
+                                  ),
+                                );
+                                _refreshDashboard();
+                              },
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        child: _SummaryCard(
-                          title: 'Total Beras',
-                          value: '${data.totalBeras.toStringAsFixed(1)} Kg',
-                          icon: Icons.rice_bowl_rounded,
-                          accentColor: AppColors.gold,
+                      ListView(
+                        padding: EdgeInsets.fromLTRB(
+                          20,
+                          topPadding + 90,
+                          20,
+                          140 + bottomPadding,
+                        ),
+                        children: [
+                          _ProfileTabContent(
+                            username: widget.username,
+                            email: AuthService.instance.currentUser?.email,
+                            totalMuzakkiCount:
+                                data.countFitrah +
+                                data.countProfesi +
+                                data.countMaal,
+                            onLogout: () async =>
+                                await AuthService.instance.signOut(),
+                            onDeleteAccount: () async =>
+                                await AuthService.instance.deleteAccount(),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                // LAYER 2: TOP APP BAR MELAYANG KACA
+                Positioned(
+                  top: topPadding + 12,
+                  left: 20,
+                  right: 20,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 25.0, sigmaY: 25.0),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.35),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.5),
+                            width: 1.5,
+                          ),
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 14,
+                        ),
+                        child: Row(
+                          children: [
+                            Text(
+                              _selectedTab == 0 ? 'Amil Track' : 'Profil Amil',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.emeraldDeep,
+                                fontSize: 18,
+                              ),
+                            ),
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.emeraldDeep,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: const Row(
+                                children: [
+                                  Icon(
+                                    Icons.mosque_rounded,
+                                    color: AppColors.gold,
+                                    size: 14,
+                                  ),
+                                  SizedBox(width: 5),
+                                  Text(
+                                    'AT',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.gold,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // LAYER 3: TRUE NOTCHED LIQUID BAR MURNI (KETINGGIAN PROPORSIONAL)
+                Positioned(
+                  bottom: 24 + bottomPadding,
+                  left: 20,
+                  right: 20,
+                  height: 65,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(32),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: ClipPath(
+                      clipper: _CustomLiquidNotchClipper(),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 30.0, sigmaY: 30.0),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.5),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.6),
+                              width: 1.5,
+                            ),
+                            borderRadius: BorderRadius.circular(32),
+                          ),
+                          child: Row(
+                            children: [
+                              _buildClassicNavItem(
+                                icon: Icons.home_rounded,
+                                label: 'Amil',
+                                isActive: _selectedTab == 0,
+                                onTap: () => setState(() => _selectedTab = 0),
+                              ),
+                              const SizedBox(width: 80),
+                              _buildClassicNavItem(
+                                icon: Icons.person_rounded,
+                                label: 'Profile',
+                                isActive: _selectedTab == 1,
+                                onTap: () => setState(() => _selectedTab = 1),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // LAYER 4: FAB LAYER PALING ATAS (FIX HIT-BOX)
+                Positioned(
+                  bottom: 24 + bottomPadding + 32,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Container(
+                      height: 58,
+                      width: 58,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.orangeGold.withValues(alpha: 0.45),
+                            blurRadius: 14,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: FloatingActionButton(
+                        elevation: 0,
+                        backgroundColor: AppColors.orangeGold,
+                        foregroundColor: Colors.white,
+                        shape: const CircleBorder(),
+                        onPressed: () async {
+                          final result = await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const TransactionFormScreen(),
+                            ),
+                          );
+                          if (result == true) _refreshDashboard();
+                        },
+                        child: const Icon(Icons.add_rounded, size: 34),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // LAYER 5: NETWORK BANNER
+                AnimatedPositioned(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                  bottom: 110 + bottomPadding,
+                  left: 30,
+                  right: 30,
+                  child:
+                      Container(
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: _isOnline
+                                  ? Colors.green.shade700
+                                  : Colors.black87,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              _isOnline
+                                  ? 'Kembali online'
+                                  : 'Tidak ada koneksi internet',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          )
+                          .animate(target: (!_isOnline || _wasOffline) ? 1 : 0)
+                          .fade(duration: 200.ms)
+                          .slideY(begin: 1, end: 0),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _CustomLiquidNotchClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final path = Path();
+    final double w = size.width;
+    final double h = size.height;
+    final double r = 32.0;
+
+    path.moveTo(r, 0);
+    path.lineTo(w / 2 - 46, 0);
+    path.cubicTo(w / 2 - 26, 0, w / 2 - 30, h * 0.68, w / 2, h * 0.68);
+    path.cubicTo(w / 2 + 30, h * 0.68, w / 2 + 26, 0, w / 2 + 46, 0);
+    path.lineTo(w - r, 0);
+    path.arcToPoint(Offset(w, r), radius: Radius.circular(r), clockwise: true);
+    path.lineTo(w, h - r);
+    path.arcToPoint(
+      Offset(w - r, h),
+      radius: Radius.circular(r),
+      clockwise: true,
+    );
+    path.lineTo(r, h);
+    path.arcToPoint(
+      Offset(0, h - r),
+      radius: Radius.circular(r),
+      clockwise: true,
+    );
+    path.lineTo(0, r);
+    path.arcToPoint(Offset(r, 0), radius: Radius.circular(r), clockwise: true);
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+}
+
+// ============================================================================
+// WIDGET KOMPONEN PEMBANTU (MURNI EMERALD DESIGN)
+// ============================================================================
+
+class _HeroDashboardCard extends StatelessWidget {
+  final String username;
+  final double totalUang;
+  final double totalBeras;
+  final int todayCount;
+  const _HeroDashboardCard({
+    required this.username,
+    required this.totalUang,
+    required this.totalBeras,
+    required this.todayCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final currencyFormat = NumberFormat.currency(
+      locale: 'id_ID',
+      symbol: 'Rp ',
+      decimalDigits: 0,
+    );
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.emeraldDeep, AppColors.emerald],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.emerald.withValues(alpha: 0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -15,
+            top: -15,
+            child: Icon(
+              Icons.account_balance_wallet_rounded,
+              size: 130,
+              color: Colors.white.withValues(alpha: 0.08),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Assalamu\'alaikum,',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.75),
+                            fontSize: 13,
+                          ),
+                        ),
+                        Text(
+                          username,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 19,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.people_alt_rounded,
+                            color: Colors.white,
+                            size: 14,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$todayCount Hari Ini',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 28),
+                const Text(
+                  'TOTAL KAS TERKUMPUL',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  currencyFormat.format(totalUang),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 34,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.rice_bowl_rounded,
+                        color: AppColors.gold,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Sembako Beras: ${totalBeras.toStringAsFixed(1)} Kg',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ],
                   ),
-                ],
-              );
-            },
-          ),
-          _ProfileTabContent(
-            username: username,
-            email: user?.email,
-            onLogout: () async {
-              await AuthService.instance.signOut();
-            },
-            onDeleteAccount: () async {
-              await AuthService.instance.deleteAccount();
-            },
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -197,118 +769,488 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
+class _ActionGrid extends StatelessWidget {
+  final int todayMuzakki;
+  final double todayUang;
+  const _ActionGrid({required this.todayMuzakki, required this.todayUang});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _BeautifulActionTile(
+            icon: Icons.calculate_rounded,
+            title: 'Hitung\nFidyah',
+            iconColor: Colors.purple,
+            bgColor: Colors.purple.withValues(alpha: 0.08),
+            onTap: () => showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (ctx) => const _FidyahModal(),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _BeautifulActionTile(
+            icon: Icons.share_rounded,
+            title: 'Kirim\nRekap',
+            iconColor: Colors.blue.shade700,
+            bgColor: Colors.blue.withValues(alpha: 0.08),
+            onTap: () => showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (ctx) =>
+                  _RekapHarianModal(muzakki: todayMuzakki, uang: todayUang),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _BeautifulActionTile(
+            icon: Icons.menu_book_rounded,
+            title: 'Panduan\nFikih',
+            iconColor: Colors.teal,
+            bgColor: Colors.teal.withValues(alpha: 0.08),
+            onTap: () => _launchWithConfirmation(
+              context,
+              'https://baznas.go.id',
+              'Buka Situs BAZNAS',
+              'Anda akan diarahkan ke browser luar untuk melihat panduan resmi. Lanjutkan?',
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BeautifulActionTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final Color iconColor;
+  final Color bgColor;
+  final VoidCallback onTap;
+  const _BeautifulActionTile({
+    required this.icon,
+    required this.title,
+    required this.iconColor,
+    required this.bgColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(24),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: bgColor,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: iconColor, size: 26),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                    height: 1.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DistributionMiniChart extends StatelessWidget {
+  final int fitrah;
+  final int profesi;
+  final int maal;
+  const _DistributionMiniChart({
+    required this.fitrah,
+    required this.profesi,
+    required this.maal,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final int total = fitrah + profesi + maal;
+    final int flexFitrah = total > 0 ? ((fitrah / total) * 100).round() : 0;
+    final int flexProfesi = total > 0 ? ((profesi / total) * 100).round() : 0;
+    final int flexMaal = total > 0 ? ((maal / total) * 100).round() : 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Metrik Sebaran Zakat',
+          style: TextStyle(
+            fontWeight: FontWeight.w900,
+            fontSize: 16,
+            color: AppColors.emeraldDeep,
+          ),
+        ),
+        const SizedBox(height: 12),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: SizedBox(
+            height: 12,
+            child: total == 0
+                ? Container(color: Colors.grey.withValues(alpha: 0.3))
+                : Row(
+                    children: [
+                      if (flexFitrah > 0)
+                        Expanded(
+                          flex: flexFitrah,
+                          child: Container(color: AppColors.emerald),
+                        ),
+                      if (flexProfesi > 0)
+                        Expanded(
+                          flex: flexProfesi,
+                          child: Container(color: AppColors.orangeGold),
+                        ),
+                      if (flexMaal > 0)
+                        Expanded(
+                          flex: flexMaal,
+                          child: Container(color: AppColors.gold),
+                        ),
+                    ],
+                  ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _ChartIndicatorTag(
+              label: 'Fitrah ($fitrah)',
+              color: AppColors.emerald,
+            ),
+            _ChartIndicatorTag(
+              label: 'Profesi ($profesi)',
+              color: AppColors.orangeGold,
+            ),
+            _ChartIndicatorTag(label: 'Maal ($maal)', color: AppColors.gold),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+// FIX: Perbaikan Typo Parameter pada constructor _ChartIndicatorTag
+class _ChartIndicatorTag extends StatelessWidget {
+  final String label;
+  final Color color;
+  const _ChartIndicatorTag({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            color: AppColors.textSecondary,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ActivityFeed extends StatelessWidget {
+  final List<Map<String, dynamic>> transactions;
+  final VoidCallback onSeeAll;
+  const _ActivityFeed({required this.transactions, required this.onSeeAll});
+
+  @override
+  Widget build(BuildContext context) {
+    final currencyFormat = NumberFormat.currency(
+      locale: 'id_ID',
+      symbol: 'Rp ',
+      decimalDigits: 0,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Setoran Terkini',
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 16,
+                color: AppColors.emeraldDeep,
+              ),
+            ),
+            TextButton(
+              onPressed: onSeeAll,
+              child: const Text(
+                'Lihat Semua',
+                style: TextStyle(
+                  color: AppColors.emerald,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (transactions.isEmpty)
+          SoftSurfaceCard(
+            backgroundColor: Colors.white.withValues(alpha: 0.85),
+            child: const Padding(
+              padding: EdgeInsets.all(24.0),
+              child: Center(
+                child: Text(
+                  'Belum ada transaksi.',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+          )
+        else
+          ...transactions.map((tx) {
+            final String nama =
+                tx[SqliteService.columnNamaMuzakki] ?? 'Hamba Allah';
+            final String kategori =
+                tx[SqliteService.columnKategoriZakat] ?? 'Fitrah';
+            // FIX: Perbaikan Typo 'columnTypeJumlah' menjadi 'columnJumlah' murni
+            final double jumlah = tx[SqliteService.columnJumlah] ?? 0.0;
+            final String satuan = tx[SqliteService.columnTipeSatuan] ?? 'uang';
+            final String displayJumlah = (satuan == 'beras')
+                ? '${jumlah.toStringAsFixed(1)} Kg'
+                : currencyFormat.format(jumlah);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: SoftSurfaceCard(
+                backgroundColor: Colors.white.withValues(alpha: 0.9),
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.softSurface,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        kategori == 'Fitrah'
+                            ? Icons.rice_bowl_rounded
+                            : Icons.payments_rounded,
+                        size: 20,
+                        color: AppColors.emeraldDeep,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            nama,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 15,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Zakat $kategori',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      displayJumlah,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 15,
+                        color: AppColors.emeraldDeep,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+      ],
+    );
+  }
+}
+
 class _ProfileTabContent extends StatefulWidget {
+  final String username;
+  final String? email;
+  final int totalMuzakkiCount;
+  final Future<void> Function() onLogout;
+  final Future<void> Function() onDeleteAccount;
   const _ProfileTabContent({
     required this.username,
     required this.email,
+    required this.totalMuzakkiCount,
     required this.onLogout,
     required this.onDeleteAccount,
   });
-
-  final String username;
-  final String? email;
-  final Future<void> Function() onLogout;
-  final Future<void> Function() onDeleteAccount;
-
   @override
   State<_ProfileTabContent> createState() => _ProfileTabContentState();
 }
 
 class _ProfileTabContentState extends State<_ProfileTabContent> {
   bool _working = false;
-
-  Future<void> _runGuarded(Future<void> Function() action) async {
-    setState(() => _working = true);
-    try {
-      await action();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Aksi gagal: $e')));
-    } finally {
-      if (mounted) setState(() => _working = false);
-    }
-  }
-
-  Future<bool?> _confirmAction({
-    required String title,
-    required String body,
-    required String confirmLabel,
-  }) {
-    return showDialog<bool>(
+  void _showDeleteModal() {
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title),
-        content: Text(body),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(confirmLabel),
-          ),
-        ],
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(28),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.warning_rounded, color: Colors.red, size: 48),
+            const SizedBox(height: 16),
+            const Text(
+              'Hapus Akun Permanen?',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Tindakan ini tidak bisa dibatalkan. Seluruh data lokal Anda akan dibersihkan.',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Batal'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                    ),
+                    onPressed: () {
+                      widget.onDeleteAccount();
+                    },
+                    child: const Text(
+                      'Hapus',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        AppSpacing.lg,
-        AppSpacing.lg,
-        110,
-      ),
+    return Column(
       children: [
         SoftSurfaceCard(
           backgroundColor: AppColors.emerald,
           borderColor: AppColors.emerald,
-          shadowColor: AppColors.shadowDark,
-          highlightOpacity: 0.18,
-          highlightAlignment: Alignment.topCenter,
-          highlightRadius: 1.1,
           child: Row(
             children: [
               CircleAvatar(
                 radius: 30,
-                backgroundColor: Colors.white.withValues(alpha: 0.15),
+                backgroundColor: Colors.white.withValues(alpha: 0.18),
                 child: const Icon(
-                  Icons.person_rounded,
+                  Icons.badge_rounded,
                   color: Colors.white,
                   size: 34,
                 ),
               ),
-              const SizedBox(width: AppSpacing.md),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Profil Amil',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.7),
+                      'Amil Terverifikasi',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.72),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
                     Text(
                       widget.username,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      style: const TextStyle(
                         color: Colors.white,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 20,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      widget.email ?? 'Tidak diketahui',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.72),
+                      widget.email ?? 'amil@amiltrack.com',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.65),
+                        fontSize: 12,
                       ),
                     ),
                   ],
@@ -317,440 +1259,433 @@ class _ProfileTabContentState extends State<_ProfileTabContent> {
             ],
           ),
         ),
-        const SizedBox(height: AppSpacing.lg),
+        const SizedBox(height: 24),
+        const Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Statistik Personal',
+            style: TextStyle(
+              color: AppColors.emeraldDeep,
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
         SoftSurfaceCard(
-          backgroundColor: Colors.white,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          backgroundColor: Colors.white.withValues(alpha: 0.9),
+          padding: const EdgeInsets.all(20),
+          child: Row(
             children: [
-              Text(
-                'Akun & Akses',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppColors.emeraldDeep,
-                  fontWeight: FontWeight.w800,
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.orangeGold.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.how_to_reg_rounded,
+                  color: AppColors.orangeGold,
+                  size: 28,
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Pengaturan, logout, dan penghapusan akun ada langsung di sini.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.logout_rounded),
-                label: const Text('Logout'),
-                onPressed: _working
-                    ? null
-                    : () async {
-                        final confirmed = await _confirmAction(
-                          title: 'Keluar dari akun?',
-                          body: 'Anda akan keluar dari perangkat ini.',
-                          confirmLabel: 'Logout',
-                        );
-                        if (confirmed == true) {
-                          await _runGuarded(widget.onLogout);
-                        }
-                      },
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                icon: const Icon(Icons.delete_forever_rounded),
-                label: const Text('Hapus Akun'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red.shade700,
-                  side: BorderSide(color: Colors.red.shade200),
-                ),
-                onPressed: _working
-                    ? null
-                    : () async {
-                        final confirmed = await _confirmAction(
-                          title: 'Hapus akun?',
-                          body: 'Tindakan ini bersifat permanen.',
-                          confirmLabel: 'Hapus',
-                        );
-                        if (confirmed == true) {
-                          await _runGuarded(widget.onDeleteAccount);
-                        }
-                      },
+              const SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${widget.totalMuzakkiCount} Jiwa',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const Text(
+                    'Total Muzakki Terlayani',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         ),
-        if (_working) ...[
-          const SizedBox(height: AppSpacing.md),
-          const Center(child: CircularProgressIndicator()),
-        ],
+        const SizedBox(height: 24),
+        const Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Pusat Bantuan Syariat',
+            style: TextStyle(
+              color: AppColors.emeraldDeep,
+              fontWeight: FontWeight.w900,
+              fontSize: 16,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SoftSurfaceCard(
+          backgroundColor: Colors.white.withValues(alpha: 0.9),
+          padding: EdgeInsets.zero,
+          child: ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.indigo.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.support_agent_rounded,
+                color: Colors.indigo,
+              ),
+            ),
+            title: const Text(
+              'Hotline Dewan Syariah',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            ),
+            subtitle: const Text(
+              'Konsultasi kasus fikih via WhatsApp.',
+              style: TextStyle(fontSize: 12),
+            ),
+            trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+            onTap: () => _launchWithConfirmation(
+              context,
+              'https://wa.me/628123456789?text=Assalamu%27alaikum%20Dewan%20Syariah...',
+              'Buka WhatsApp',
+              'Anda akan dialihkan ke WhatsApp untuk chat dengan Hotline Syariat. Lanjutkan?',
+            ),
+          ),
+        ),
+        const SizedBox(height: 32),
+        ElevatedButton.icon(
+          icon: const Icon(Icons.logout_rounded),
+          label: const Text(
+            'Logout Sistem',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+          style: ElevatedButton.styleFrom(
+            minimumSize: const Size(double.infinity, 54),
+            backgroundColor: AppColors.emerald,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          onPressed: _working
+              ? null
+              : () async {
+                  setState(() => _working = true);
+                  try {
+                    await widget.onLogout();
+                  } finally {
+                    if (mounted) setState(() => _working = false);
+                  }
+                },
+        ),
+        const SizedBox(height: 16),
+        OutlinedButton.icon(
+          icon: const Icon(Icons.delete_forever_rounded),
+          label: const Text(
+            'Hapus Akun Permanen',
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(double.infinity, 54),
+            foregroundColor: Colors.red.shade700,
+            side: BorderSide(color: Colors.red.shade200),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          onPressed: _working ? null : _showDeleteModal,
+        ),
       ],
     );
   }
 }
 
-class _GreetingHeader extends StatelessWidget {
-  const _GreetingHeader({required this.username});
-
-  final String username;
-
+class _FidyahModal extends StatefulWidget {
+  const _FidyahModal();
   @override
-  Widget build(BuildContext context) {
-    return SoftSurfaceCard(
-      backgroundColor: AppColors.emerald,
-      borderColor: AppColors.emerald,
-      shadowColor: AppColors.shadowDark,
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      highlightOpacity: 0.18,
-      highlightAlignment: Alignment.topCenter,
-      highlightRadius: 1.1,
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Selamat datang,',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.72),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  username,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  State<_FidyahModal> createState() => _FidyahModalState();
 }
 
-class _RateCard extends StatelessWidget {
-  const _RateCard({
-    required this.zakatUangRate,
-    required this.zakatBerasRate,
-    required this.onEditPressed,
-  });
-
-  final double? zakatUangRate;
-  final double? zakatBerasRate;
-  final VoidCallback onEditPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return SoftSurfaceCard(
-      backgroundColor: Colors.white,
-      borderRadius: BorderRadius.circular(24),
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Nisab Zakat',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: AppColors.emeraldDeep,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Nilai terbaru tahun ini',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                onPressed: onEditPressed,
-                style: IconButton.styleFrom(
-                  backgroundColor: AppColors.softSurface,
-                ),
-                icon: const Icon(Icons.edit_rounded),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Row(
-            children: [
-              Expanded(
-                child: _RateTile(
-                  label: 'UANG',
-                  icon: Icons.payments_rounded,
-                  value: zakatUangRate == null
-                      ? 'Belum diisi'
-                      : 'Rp ${zakatUangRate!.toStringAsFixed(0)}',
-                  subtitle: 'Nisab uang per jiwa',
-                  color: AppColors.emerald,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: _RateTile(
-                  label: 'BERAS',
-                  icon: Icons.rice_bowl_rounded,
-                  value: zakatBerasRate == null
-                      ? 'Belum diisi'
-                      : '${zakatBerasRate!.toStringAsFixed(1)} Kg',
-                  subtitle: 'Nisab beras per jiwa',
-                  color: AppColors.gold,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RateTile extends StatelessWidget {
-  const _RateTile({
-    required this.label,
-    required this.icon,
-    required this.value,
-    required this.subtitle,
-    required this.color,
-  });
-
-  final String label;
-  final IconData icon;
-  final String value;
-  final String subtitle;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.softSurface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.65)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: color, size: 18),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.0,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.accentColor,
-  });
-
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color accentColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return SoftSurfaceCard(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      borderRadius: BorderRadius.circular(22),
-      backgroundColor: Colors.white,
-      child: Row(
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: accentColor.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: accentColor),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DashboardData {
-  const _DashboardData({
-    this.zakatUangRate,
-    this.zakatBerasRate,
-    this.totalUang = 0,
-    this.totalBeras = 0,
-  });
-
-  final double? zakatUangRate;
-  final double? zakatBerasRate;
-  final double totalUang;
-  final double totalBeras;
-}
-
-class _NisabDialog extends StatefulWidget {
-  const _NisabDialog({this.initialUang, this.initialBeras});
-
-  final double? initialUang;
-  final double? initialBeras;
-
-  @override
-  State<_NisabDialog> createState() => _NisabDialogState();
-}
-
-class _NisabDialogState extends State<_NisabDialog> {
-  late final TextEditingController _uangController;
-  late final TextEditingController _berasController;
-  bool _saving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _uangController = TextEditingController(
-      text: widget.initialUang?.toStringAsFixed(0) ?? '',
-    );
-    _berasController = TextEditingController(
-      text: widget.initialBeras?.toStringAsFixed(1).replaceAll('.', ',') ?? '',
-    );
+class _FidyahModalState extends State<_FidyahModal> {
+  final _hariController = TextEditingController();
+  double _total = 0;
+  void _hitung() {
+    final hari = int.tryParse(_hariController.text) ?? 0;
+    setState(() => _total = hari * 60000.0);
   }
 
   @override
   void dispose() {
-    _uangController.dispose();
-    _berasController.dispose();
+    _hariController.dispose();
     super.dispose();
-  }
-
-  Future<void> _save() async {
-    setState(() => _saving = true);
-    try {
-      await SupabaseService.instance.updateSettingValue(
-        key: SupabaseService.zakatUangSettingKey,
-        value: _uangController.text.trim(),
-      );
-      await SupabaseService.instance.updateSettingValue(
-        key: SupabaseService.zakatBerasSettingKey,
-        value: _berasController.text.trim(),
-      );
-      if (mounted) Navigator.of(context).pop(true);
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      scrollable: true,
-      title: const Text('Atur Nisab'),
-      content: Column(
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: GlassContainer(
+        width: double.infinity,
+        borderRadius: 28,
+        padding: const EdgeInsets.all(28),
+        backgroundColor: AppColors.emeraldDeep.withValues(alpha: 0.85),
+        glassOpacity: 0.9,
+        blur: 20,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 45,
+              height: 5,
+              decoration: BoxDecoration(
+                color: Colors.white30,
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Kalkulator Fidyah Syar\'i',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 19,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const Text(
+              'Ketetapan BAZNAS: Rp 60.000 / Hari',
+              style: TextStyle(
+                color: AppColors.gold,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 24),
+            TextField(
+              controller: _hariController,
+              keyboardType: TextInputType.number,
+              onChanged: (v) => _hitung(),
+              style: const TextStyle(
+                color: AppColors.gold,
+                fontWeight: FontWeight.bold,
+                fontSize: 26,
+              ),
+              textAlign: TextAlign.center,
+              decoration: InputDecoration(
+                hintText: 'Jumlah Hari Utang Puasa',
+                hintStyle: const TextStyle(color: Colors.white30, fontSize: 15),
+                filled: true,
+                fillColor: Colors.black26,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  borderSide: const BorderSide(
+                    color: AppColors.gold,
+                    width: 1.5,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: Colors.white24, width: 1),
+              ),
+              child: Column(
+                children: [
+                  const Text(
+                    'KONTRIBUSI FIDYAH WAJIB',
+                    style: TextStyle(
+                      color: Colors.white60,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    NumberFormat.currency(
+                      locale: 'id_ID',
+                      symbol: 'Rp ',
+                      decimalDigits: 0,
+                    ).format(_total),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 30,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.orangeGold,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 54),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 0,
+              ),
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Selesai & Catat',
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RekapHarianModal extends StatelessWidget {
+  final int muzakki;
+  final double uang;
+  const _RekapHarianModal({required this.muzakki, required this.uang});
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassContainer(
+      width: double.infinity,
+      borderRadius: 28,
+      padding: const EdgeInsets.all(28),
+      backgroundColor: AppColors.emeraldDeep.withValues(alpha: 0.85),
+      glassOpacity: 0.9,
+      blur: 20,
+      child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          TextField(
-            controller: _uangController,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Nisab Uang (Rp)'),
+          Container(
+            width: 45,
+            height: 5,
+            decoration: BoxDecoration(
+              color: Colors.white30,
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _berasController,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(labelText: 'Nisab Beras (Kg)'),
+          const SizedBox(height: 20),
+          const Text(
+            'Rekapitulasi Tugas Hari Ini',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 19,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const Text(
+            'Data himpunan zakat real-time amil',
+            style: TextStyle(color: Colors.white60, fontSize: 12),
+          ),
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.all(22),
+            decoration: BoxDecoration(
+              color: Colors.black12,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white12),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Total Muzakki',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      '$muzakki Jiwa',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Divider(color: Colors.white12, height: 1),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Dana Terhimpun',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      NumberFormat.currency(
+                        locale: 'id_ID',
+                        symbol: 'Rp ',
+                        decimalDigits: 0,
+                      ).format(uang),
+                      style: const TextStyle(
+                        color: AppColors.gold,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.send_rounded, size: 20),
+            label: const Text(
+              'Kirim Laporan ke WhatsApp',
+              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.emerald,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 54),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              elevation: 0,
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              _launchWithConfirmation(
+                context,
+                'https://wa.me/?text=Laporan%20Rekap%20Harian%0AMuzakki:%20$muzakki%20Jiwa%0ADana:%20Rp%20$uang',
+                'Bagikan via WhatsApp',
+                'Buka WhatsApp untuk membagikan laporan singkat ini ke Koordinator?',
+              );
+            },
           ),
         ],
       ),
-      actions: [
-        TextButton(
-          onPressed: _saving
-              ? null
-              : () {
-                  FocusManager.instance.primaryFocus?.unfocus();
-                  Navigator.of(context).pop(false);
-                },
-          child: const Text('Batal'),
-        ),
-        ElevatedButton(
-          onPressed: _saving
-              ? null
-              : () {
-                  FocusManager.instance.primaryFocus?.unfocus();
-                  _save();
-                },
-          child: _saving
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Simpan Nisab'),
-        ),
-      ],
     );
   }
 }

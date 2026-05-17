@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import '../core/constants.dart';
 
 class AppWatermarkBackground extends StatelessWidget {
@@ -14,7 +13,8 @@ class AppWatermarkBackground extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFF7F6F1), Color(0xFFEEF3EB)],
+          // PERUBAHAN: Warna dipertegas (Dari putih krem ke hijau sage lembut)
+          colors: [Color(0xFFFCFBF8), Color(0xFFDCE7DF)],
         ),
       ),
       child: Stack(
@@ -43,7 +43,7 @@ class _GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final linePaint = Paint()
-      ..color = AppColors.emeraldDeep.withValues(alpha: 0.03)
+      ..color = AppColors.emeraldDeep.withValues(alpha: 0.04)
       ..strokeWidth = 1;
 
     for (var y = 0.0; y < size.height; y += 28) {
@@ -51,7 +51,7 @@ class _GridPainter extends CustomPainter {
     }
 
     final dotPaint = Paint()
-      ..color = AppColors.watermark.withValues(alpha: 0.45);
+      ..color = AppColors.emeraldDeep.withValues(alpha: 0.18); 
     for (var y = 16.0; y < size.height; y += 38) {
       for (var x = 16.0; x < size.width; x += 38) {
         canvas.drawCircle(Offset(x, y), 0.8, dotPaint);
@@ -63,9 +63,9 @@ class _GridPainter extends CustomPainter {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          AppColors.emerald.withValues(alpha: 0.06),
+          AppColors.emerald.withValues(alpha: 0.08),
           Colors.transparent,
-          AppColors.gold.withValues(alpha: 0.05),
+          AppColors.gold.withValues(alpha: 0.07),
         ],
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
     canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), shimmerPaint);
@@ -89,25 +89,26 @@ class _AmbientPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final circlePaint = Paint()..style = PaintingStyle.fill;
 
-    circlePaint.color = AppColors.emerald.withValues(alpha: 0.08);
-    circlePaint.maskFilter = const MaskFilter.blur(BlurStyle.normal, 28);
+    // PERUBAHAN: Opacity ambient dinaikkan agar gradasi cahaya lebih kentara
+    circlePaint.color = AppColors.emerald.withValues(alpha: 0.12);
+    circlePaint.maskFilter = const MaskFilter.blur(BlurStyle.normal, 32);
     canvas.drawCircle(
       Offset(size.width * 0.08, size.height * 0.08),
-      size.shortestSide * 0.16,
+      size.shortestSide * 0.18,
       circlePaint,
     );
 
-    circlePaint.color = AppColors.gold.withValues(alpha: 0.08);
+    circlePaint.color = AppColors.gold.withValues(alpha: 0.12);
     canvas.drawCircle(
       Offset(size.width * 0.9, size.height * 0.12),
-      size.shortestSide * 0.12,
+      size.shortestSide * 0.14,
       circlePaint,
     );
 
-    circlePaint.color = AppColors.orangeGold.withValues(alpha: 0.07);
+    circlePaint.color = AppColors.orangeGold.withValues(alpha: 0.10);
     canvas.drawCircle(
       Offset(size.width * 0.12, size.height * 0.88),
-      size.shortestSide * 0.14,
+      size.shortestSide * 0.16,
       circlePaint,
     );
   }
@@ -128,9 +129,9 @@ class _ShimmerLayer extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              AppColors.emerald.withValues(alpha: 0.03),
+              AppColors.emerald.withValues(alpha: 0.04),
               Colors.transparent,
-              AppColors.gold.withValues(alpha: 0.025),
+              AppColors.gold.withValues(alpha: 0.035),
             ],
           ),
         ),
