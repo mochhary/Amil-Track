@@ -1,70 +1,102 @@
-import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'sqlite_service.dart';
 
 class SyncService {
-  static final SyncService instance = SyncService._init();
-  SyncService._init();
+  SyncService._privateConstructor();
+  static final SyncService instance = SyncService._privateConstructor();
 
+  final _supabase = Supabase.instance.client;
+
+  // Gembok agar mesin tidak jalan ganda dan bertabrakan
   bool _isSyncing = false;
 
-  Future<String> syncPendingData() async {
-    if (_isSyncing) return 'Sinkronisasi sedang berjalan di latar belakang.';
+  // ==========================================================
+  // MASTER FUNGSI: SINKRONISASI DUA ARAH (TWO-WAY AUTO SYNC)
+  // ==========================================================
+  Future<bool> autoSync() async {
+    if (_isSyncing) return false;
     _isSyncing = true;
+    bool uiNeedsRefresh = false;
 
     try {
       final db = await SqliteService.instance.database;
-      final pendingRows = await db.query(
+
+      // --------------------------------------------------------
+      // TAHAP 1: PUSH (Kirim Data Baru dari Lokal ke Cloud)
+      // --------------------------------------------------------
+      final pendingRecords = await db.query(
         SqliteService.tableTransactions,
         where: '${SqliteService.columnSyncStatus} = ?',
         whereArgs: [0],
       );
 
-      if (pendingRows.isEmpty) {
-        _isSyncing = false;
-        return 'Seluruh data telah tersinkronisasi.';
+      for (var record in pendingRecords) {
+        await _supabase.from('zakat_transactions').insert({
+          'nama_muzakki': record[SqliteService.columnNamaMuzakki],
+          'kategori_zakat': record[SqliteService.columnKategoriZakat],
+          'jumlah': record[SqliteService.columnJumlah],
+          'tipe_satuan': record[SqliteService.columnTipeSatuan],
+          'jumlah_jiwa': record[SqliteService.columnJumlahJiwa],
+          'created_at': record[SqliteService.columnCreatedAt],
+        });
+
+        await db.update(
+          SqliteService.tableTransactions,
+          {SqliteService.columnSyncStatus: 1},
+          where: '${SqliteService.columnId} = ?',
+          whereArgs: [record[SqliteService.columnId]],
+        );
       }
 
-      final supabase = Supabase.instance.client;
-      int successCount = 0;
-      String lastErrorMessage = '';
+      // --------------------------------------------------------
+      // TAHAP 2: PULL (Tarik Data Baru dari Cloud ke Lokal)
+      // --------------------------------------------------------
+      // Cek kapan terakhir kali aplikasi kita menyimpan data
+      final maxDateRes = await db.rawQuery(
+        'SELECT MAX(${SqliteService.columnCreatedAt}) as max_date FROM ${SqliteService.tableTransactions}',
+      );
+      final String? latestLocalTime = maxDateRes.first['max_date'] as String?;
 
-      for (final row in pendingRows) {
-        try {
-          final Map<String, dynamic> payload = {
-            'nama_muzakki': row[SqliteService.columnNamaMuzakki],
-            'kategori_zakat': row[SqliteService.columnKategoriZakat],
-            'tipe_bayar': row[SqliteService.columnTipeSatuan],
-            'total_bayar': row[SqliteService.columnJumlah],
-            'jumlah_jiwa': 1,
-            'created_at': row[SqliteService.columnCreatedAt],
-          };
+      List<dynamic> cloudData;
+      if (latestLocalTime != null) {
+        // Jika sudah ada data, cukup tarik data yang LEBIH BARU dari waktu lokal terakhir
+        cloudData = await _supabase
+            .from('zakat_transactions')
+            .select()
+            .gt('created_at', latestLocalTime);
+      } else {
+        // Jika lokal kosong (baru diinstal), tarik seluruh isi Supabase
+        cloudData = await _supabase.from('zakat_transactions').select();
+      }
 
-          await supabase.from('zakat_transactions').insert(payload);
+      for (var record in cloudData) {
+        // Proteksi Lapis Baja: Pastikan data belum ada di SQLite sebelum disuntikkan
+        final existing = await db.query(
+          SqliteService.tableTransactions,
+          where: '${SqliteService.columnCreatedAt} = ?',
+          whereArgs: [record['created_at']],
+        );
 
-          await db.update(
-            SqliteService.tableTransactions,
-            {SqliteService.columnSyncStatus: 1},
-            where: '${SqliteService.columnLocalId} = ?',
-            whereArgs: [row[SqliteService.columnLocalId]],
-          );
-          
-          successCount++;
-        } catch (e) {
-          lastErrorMessage = e.toString();
-          debugPrint('Supabase Error: $lastErrorMessage');
+        if (existing.isEmpty) {
+          await db.insert(SqliteService.tableTransactions, {
+            SqliteService.columnNamaMuzakki: record['nama_muzakki'],
+            SqliteService.columnKategoriZakat: record['kategori_zakat'],
+            SqliteService.columnJumlah: record['jumlah'],
+            SqliteService.columnTipeSatuan: record['tipe_satuan'] ?? 'uang',
+            SqliteService.columnJumlahJiwa: record['jumlah_jiwa'],
+            SqliteService.columnCreatedAt: record['created_at'],
+            SqliteService.columnSyncStatus: 1, // Langsung cap tersinkronisasi
+          });
+          uiNeedsRefresh =
+              true; // Beri sinyal ke layar utama untuk memperbarui angka
         }
       }
-
-      if (successCount == pendingRows.length) {
-        return 'Berhasil menyinkronkan $successCount data ke server.';
-      } else {
-        return 'Gagal menyinkronkan beberapa data. Sistem akan mencoba lagi nanti.';
-      }
     } catch (e) {
-      return 'Terjadi kesalahan sistem sinkronisasi.';
+      print('🛑 [AUTO-SYNC ERROR]: $e');
     } finally {
       _isSyncing = false;
     }
+
+    return uiNeedsRefresh;
   }
 }

@@ -34,7 +34,7 @@ _Fokus: Setup awal framework dan pemisahan arsitektur._
 
 ---
 
-## ⏳ FASE 3: UI/UX Revamp & Premium Micro-Interactions
+## ⏳ FASE 3: UI/UX Revamp & Premium Micro-Interactions (SELESAI)
 
 _Fokus: Merombak visual kaku menjadi aplikasi premium yang modern, kekinian, interaktif, dan berkelas tinggi (Gaya iOS/Android Modern)._
 
@@ -45,7 +45,7 @@ _Fokus: Merombak visual kaku menjadi aplikasi premium yang modern, kekinian, int
 - [x] **Walkthrough Hint Terpandu:** Mengimplementasikan _Step-by-step Tutorial_ otomatis saat user yang baru pertama kali mendaftar/masuk berhasil mendarat di halaman beranda (menyorot tombol tambah zakat, menu profil, dll).
 - [x] **Alur Hapus Akun Berstandar Industri:** Merancang _Bottom Sheet_ konfirmasi bertingkat berwarna merah peringatan yang mewajibkan user mengetik kata kunci konfirmasi atau mencentang persetujuan sebelum memanggil fungsi _soft-delete_.
 
-## ⏳ FASE 4: Skema Kategori Zakat & Arsitektur Offline-First
+## ⏳ FASE 4: Skema Kategori Zakat & Arsitektur Offline-First (SELESAI)
 
 _Fokus: Mengubah arsitektur agar sesuai standar akuntabilitas BAZNAS dan menjamin aplikasi tetap bekerja penuh di daerah tanpa internet._
 
@@ -54,22 +54,22 @@ _Fokus: Mengubah arsitektur agar sesuai standar akuntabilitas BAZNAS dan menjami
 - [x] **Setup Database SQLite Lokal:** Merancang skema tabel `local_transactions` di dalam memori internal HP yang memuat kolom tambahan `sync_status` (pending/synced).
 - [x] **Background Sync Engine:** Membangun fungsi sinkronisasi otomatis yang berjalan di latar belakang untuk mengunggah seluruh data berstatus _pending_ dari SQLite ke cloud Supabase begitu perangkat mendeteksi sinyal internet kembali stabil.
 
-## ⏳ FASE 5: Kalkulator Zakat Otomatis (Standar BAZNAS)
+## ⏳ FASE 5: Kalkulator Zakat Otomatis (Standar BAZNAS) (SELESAI)
 
 _Fokus: Memindahkan seluruh beban perhitungan matematika hukum zakat yang rumit dari otak amil ke dalam sistem algoritma pintar._
 
 - [x] **Core Logic Calculator:** Membuat file kelas terisolasi `zakat_calculator.dart` di dalam folder `core/` atau `services/`.
 - [x] **Algoritma Zakat Fitrah:** Mengunci rumus perhitungan berbasis makanan pokok (`Jumlah Jiwa x Besaran Nilai Kg x Harga Beras Lokal Acuan`).
-- [ ] **Algoritma Zakat Profesi (Penghasilan):** Menyusun logika pengecekan Nisab otomatis berdasarkan nilai konversi 85 gram emas per tahun (atau bulanan) beserta persentase kewajiban pengeluaran sebesar 2.5%.
-- [ ] **Algoritma Zakat Maal (Harta Simpanan):** Menyusun logika validasi syarat Haul (minimal mengendap 1 tahun) pada aset harta/tabungan dan perhitungan tarif wajib zakat 2.5%.
+- [x] **Algoritma Zakat Profesi (Penghasilan):** Menyusun logika pengecekan Nisab otomatis berdasarkan nilai konversi 85 gram emas per tahun (atau bulanan) beserta persentase kewajiban pengeluaran sebesar 2.5%.
+- [x] **Algoritma Zakat Maal (Harta Simpanan):** Menyusun logika validasi syarat Haul (minimal mengendap 1 tahun) pada aset harta/tabungan dan perhitungan tarif wajib zakat 2.5%.
 
 ## ⏳ FASE 6: Dynamic UI Slicing & Integrasi Kalkulator
 
 _Fokus: Menyatukan keindahan visual premium (Fase 3) dengan kecerdasan algoritma perhitungan (Fase 5)._
 
-- [ ] **Dashboard Grid Menu:** Mengubah total halaman beranda menjadi bentuk _Grid Menu_ interaktif berbasis ikon modern kustom untuk setiap kategori zakat, lengkap dengan ringkasan visual total perolehan di sisi atas.
-- [ ] **Smart Form Transaction:** Membuat formulir input dinamis yang komponen kolomnya berubah secara otomatis menyesuaikan jenis menu zakat yang diklik oleh amil (misalnya: memilih Zakat Profesi otomatis hanya menampilkan input kolom "Gaji Bulanan" & "Bonus").
-- [ ] **Real-time Input Feedback:** Menampilkan _floating badge_ indah secara _live_ saat amil sedang mengetik angka di form, memberikan teks hijau berkilau _"Wajib Zakat: Rp X"_ jika mencapai nisab, atau teks merah lembut _"Belum Mencapai Nisab, Sarankan Sedekah"_ jika di bawah batas limit.
+- [x] **Dashboard Grid Menu:** Mengubah total halaman beranda menjadi bentuk _Grid Menu_ interaktif berbasis ikon modern kustom untuk setiap kategori zakat, lengkap dengan ringkasan visual total perolehan di sisi atas.
+- [x] **Smart Form Transaction:** Membuat formulir input dinamis yang komponen kolomnya berubah secara otomatis menyesuaikan jenis menu zakat yang diklik oleh amil (misalnya: memilih Zakat Profesi otomatis hanya menampilkan input kolom "Gaji Bulanan" & "Bonus").
+- [x] **Real-time Input Feedback:** Menampilkan _floating badge_ indah secara _live_ saat amil sedang mengetik angka di form, memberikan teks hijau berkilau _"Wajib Zakat: Rp X"_ jika mencapai nisab, atau teks merah lembut _"Belum Mencapai Nisab, Sarankan Sedekah"_ jika di bawah batas limit.
 
 ## ⏳ FASE 7: Sistem Pelaporan & Ekspor PDF Resmi
 
@@ -96,3 +96,13 @@ _Fokus: Standardisasi dan optimalisasi performa menyeluruh agar aplikasi lulus s
 - [ ] **Native Splash Screen Engine:** Mengonfigurasi package `flutter_native_splash` untuk membuang tampilan layar putih hampa saat aplikasi pertama kali dimuat di ponsel pengguna.
 - [ ] **Code Analysis & Linting Audit:** Menjalankan perintah analisis ketat `flutter analyze` untuk membersihkan seluruh sisa kode _warning_, _unused imports_, ataupun _deprecated code_.
 - [ ] **Production Optimization:** Mematikan _debug banner_ pojok kanan atas, menguji kestabilan memori dari kebocoran (_memory leak_), serta melakukan kompilasi rilis akhir menggunakan target _bundle_ yang optimal.
+
+## ⏳ FASE 10: Optimasi Performa & Arsitektur Lanjutan (Tech Debt)
+
+_Fokus: Mengatasi potensi kerapuhan sistem (vulnerabilities) dan meningkatkan efisiensi agar aplikasi siap untuk skala pengguna masif._
+
+- [ ] **Perbaikan Kerapuhan Visual (UI Responsiveness):** Mengganti angka _hardcoded_ (magic numbers) pada `_CustomLiquidNotchClipper` dan titik absolut penempatan elemen melayang (seperti FAB) dengan perhitungan matematis dinamis menggunakan `MediaQuery` atau `LayoutBuilder` agar UI tetap presisi di berbagai ukuran dan rasio layar (termasuk tablet).
+- [ ] **Optimasi Efisiensi Query Database:** Melakukan refactoring pada fungsi `_loadDashboardData` yang saat ini menjalankan 7 query SQLite secara berurutan. Menggabungkan eksekusi menggunakan metode paralel `Future.wait([])` atau menyatukannya ke dalam satu agregasi query SQL kompleks untuk mencegah pelambatan performa (bottleneck) saat jumlah data transaksi mencapai ribuan.
+- [ ] **Pemantauan Jaringan Efisien (Network Checking):** Mengganti metode `Timer.periodic` dan `InternetAddress.lookup` yang terus-menerus berjalan dan memakan daya baterai dengan *package* `connectivity_plus`. Pendekatan _event-driven_ ini akan memantau perubahan status koneksi perangkat secara pasif tanpa harus membebani _thread_ aplikasi.
+- [ ] **Walkthrough ilang:** 
+- [ ] **Initial Cloud Pull (Two-Way Sync):** Membangun fungsi penyedot data awal yang otomatis mengunduh riwayat transaksi dari Supabase ke dalam SQLite lokal saat amil baru pertama kali login di perangkat baru.

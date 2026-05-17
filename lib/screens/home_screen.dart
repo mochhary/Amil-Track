@@ -7,7 +7,6 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../core/constants.dart';
-import '../widgets/loading_states.dart';
 import '../widgets/soft_surface_card.dart';
 import '../widgets/app_watermark_background.dart';
 import '../widgets/glass_container.dart';
@@ -17,15 +16,18 @@ import '../services/auth_service.dart';
 import '../services/sqlite_service.dart';
 import '../services/sync_service.dart';
 
-// ============================================================================
-// DATA MODEL GLOBAL & GLOBAL HELPER
-// ============================================================================
 class _DashboardData {
   final double totalUang;
   final double totalBeras;
+  final double fitrahUang;
+  final double fitrahBeras;
+  final double profesiUang;
+  final double maalUang;
+  final double fidyahUang;
   final int countFitrah;
   final int countProfesi;
   final int countMaal;
+  final int countFidyah;
   final int todayMuzakki;
   final double todayUang;
   final List<Map<String, dynamic>> recentTransactions;
@@ -33,9 +35,15 @@ class _DashboardData {
   const _DashboardData({
     this.totalUang = 0,
     this.totalBeras = 0,
+    this.fitrahUang = 0,
+    this.fitrahBeras = 0,
+    this.profesiUang = 0,
+    this.maalUang = 0,
+    this.fidyahUang = 0,
     this.countFitrah = 0,
     this.countProfesi = 0,
     this.countMaal = 0,
+    this.countFidyah = 0,
     this.todayMuzakki = 0,
     this.todayUang = 0,
     this.recentTransactions = const [],
@@ -102,9 +110,6 @@ Future<void> _launchWithConfirmation(
   }
 }
 
-// ============================================================================
-// MAIN SCREEN
-// ============================================================================
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.username});
   final String username;
@@ -118,15 +123,23 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isOnline = true;
   bool _wasOffline = false;
   Timer? _networkTimer;
+  late String _currentUsername;
 
   @override
   void initState() {
     super.initState();
+    _currentUsername = widget.username;
+
+    // 1. RENDER INSTAN: Langsung tampilkan memori lokal (Offline-First) agar UI cepat
     _dashboardFuture = _loadDashboardData();
-    _checkNetwork();
+
+    // 2. KEAJAIBAN AWAL: Tarik data dari Supabase secara siluman, lalu auto-refresh UI
+    _initialMagicSync();
+
+    // 3. RADAR AUTO-SYNC: Jalan setiap 4 detik untuk mengecek jika ada data baru
     _networkTimer = Timer.periodic(
       const Duration(seconds: 4),
-      (_) => _checkNetwork(),
+      (_) => _backgroundSync(),
     );
   }
 
@@ -136,74 +149,123 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  Future<void> _checkNetwork() async {
-    bool previousState = _isOnline;
+  // Fungsi khusus untuk sinkronisasi pertama kali buka aplikasi
+  Future<void> _initialMagicSync() async {
     try {
       final result = await InternetAddress.lookup('google.com');
-      _isOnline = result.isNotEmpty && result[0].rawAddress.isNotEmpty;
-    } on SocketException catch (_) {
-      _isOnline = false;
-    }
-    if (previousState != _isOnline && mounted) {
-      setState(() {});
-      if (_isOnline) {
-        SyncService.instance.syncPendingData();
-        _wasOffline = true;
-        Future.delayed(const Duration(seconds: 3), () {
-          if (mounted) setState(() => _wasOffline = false);
-        });
+      if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
+        if (mounted) setState(() => _isOnline = true);
+
+        bool hasNewData = await SyncService.instance.autoSync();
+        // AUTO REFRESH: Jika ada data dari Supabase (misal sehabis install ulang), layar langsung update!
+        if (hasNewData && mounted) {
+          _refreshDashboard();
+        }
       }
+    } catch (_) {
+      if (mounted) setState(() => _isOnline = false);
+    }
+  }
+
+  // Fungsi pengawas latar belakang setiap 4 detik
+  Future<void> _backgroundSync() async {
+    try {
+      final result = await InternetAddress.lookup('google.com');
+      if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
+        if (!_isOnline && mounted) {
+          setState(() {
+            _isOnline = true;
+            _wasOffline = true;
+          });
+          Future.delayed(const Duration(seconds: 3), () {
+            if (mounted) setState(() => _wasOffline = false);
+          });
+        }
+
+        bool hasNewData = await SyncService.instance.autoSync();
+        if (hasNewData && mounted) {
+          _refreshDashboard(); // Layar akan terbarui otomatis jika ada data baru masuk dari awan
+        }
+      }
+    } catch (_) {
+      if (_isOnline && mounted) setState(() => _isOnline = false);
     }
   }
 
   void _refreshDashboard() {
-    setState(() {
-      _dashboardFuture = _loadDashboardData();
-    });
-    SyncService.instance.syncPendingData();
+    if (mounted) {
+      setState(() {
+        _dashboardFuture = _loadDashboardData();
+      });
+    }
   }
 
   Future<_DashboardData> _loadDashboardData() async {
     final db = await SqliteService.instance.database;
-    final uangRes = await db.rawQuery(
-      'SELECT SUM(${SqliteService.columnJumlah}) as total FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnTipeSatuan} = "uang"',
-    );
-    final berasRes = await db.rawQuery(
-      'SELECT SUM(${SqliteService.columnJumlah}) as total FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnTipeSatuan} = "beras"',
-    );
-
-    final fitrahRes = await db.rawQuery(
-      'SELECT COUNT(*) as c FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnKategoriZakat} = "Fitrah"',
-    );
-    final profesiRes = await db.rawQuery(
-      'SELECT COUNT(*) as c FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnKategoriZakat} = "Profesi"',
-    );
-    final maalRes = await db.rawQuery(
-      'SELECT COUNT(*) as c FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnKategoriZakat} = "Maal"',
-    );
-
     final todayStr = DateTime.now().toIso8601String().substring(0, 10);
-    final todayRes = await db.rawQuery(
-      "SELECT COUNT(*) as c FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnCreatedAt} LIKE '$todayStr%'",
-    );
-    final todayUangRes = await db.rawQuery(
-      "SELECT SUM(${SqliteService.columnJumlah}) as total FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnTipeSatuan} = 'uang' AND ${SqliteService.columnCreatedAt} LIKE '$todayStr%'",
-    );
-    final recentTxs = await db.query(
-      SqliteService.tableTransactions,
-      orderBy: '${SqliteService.columnCreatedAt} DESC',
-      limit: 4,
-    );
+
+    final futures = await Future.wait([
+      db.rawQuery(
+        'SELECT SUM(${SqliteService.columnJumlah}) as total FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnTipeSatuan} = "uang"',
+      ),
+      db.rawQuery(
+        'SELECT SUM(${SqliteService.columnJumlah}) as total FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnTipeSatuan} = "beras"',
+      ),
+      db.rawQuery(
+        'SELECT SUM(${SqliteService.columnJumlah}) as total FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnKategoriZakat} = "Fitrah" AND ${SqliteService.columnTipeSatuan} = "uang"',
+      ),
+      db.rawQuery(
+        'SELECT SUM(${SqliteService.columnJumlah}) as total FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnKategoriZakat} = "Fitrah" AND ${SqliteService.columnTipeSatuan} = "beras"',
+      ),
+      db.rawQuery(
+        'SELECT SUM(${SqliteService.columnJumlah}) as total FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnKategoriZakat} = "Profesi"',
+      ),
+      db.rawQuery(
+        'SELECT SUM(${SqliteService.columnJumlah}) as total FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnKategoriZakat} = "Maal"',
+      ),
+      db.rawQuery(
+        'SELECT SUM(${SqliteService.columnJumlah}) as total FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnKategoriZakat} = "Fidyah"',
+      ),
+      db.rawQuery(
+        'SELECT COUNT(*) as c FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnKategoriZakat} = "Fitrah"',
+      ),
+      db.rawQuery(
+        'SELECT COUNT(*) as c FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnKategoriZakat} = "Profesi"',
+      ),
+      db.rawQuery(
+        'SELECT COUNT(*) as c FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnKategoriZakat} = "Maal"',
+      ),
+      db.rawQuery(
+        'SELECT COUNT(*) as c FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnKategoriZakat} = "Fidyah"',
+      ),
+      db.rawQuery(
+        "SELECT COUNT(*) as c FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnCreatedAt} LIKE '$todayStr%'",
+      ),
+      db.rawQuery(
+        "SELECT SUM(${SqliteService.columnJumlah}) as total FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnTipeSatuan} = 'uang' AND ${SqliteService.columnCreatedAt} LIKE '$todayStr%'",
+      ),
+      db.query(
+        SqliteService.tableTransactions,
+        orderBy: '${SqliteService.columnCreatedAt} DESC',
+        limit: 4,
+      ),
+    ]);
 
     return _DashboardData(
-      totalUang: (uangRes.first['total'] as num?)?.toDouble() ?? 0.0,
-      totalBeras: (berasRes.first['total'] as num?)?.toDouble() ?? 0.0,
-      countFitrah: fitrahRes.first['c'] as int? ?? 0,
-      countProfesi: profesiRes.first['c'] as int? ?? 0,
-      countMaal: maalRes.first['c'] as int? ?? 0,
-      todayMuzakki: todayRes.first['c'] as int? ?? 0,
-      todayUang: (todayUangRes.first['total'] as num?)?.toDouble() ?? 0.0,
-      recentTransactions: recentTxs,
+      totalUang: (futures[0].first['total'] as num?)?.toDouble() ?? 0.0,
+      totalBeras: (futures[1].first['total'] as num?)?.toDouble() ?? 0.0,
+      fitrahUang: (futures[2].first['total'] as num?)?.toDouble() ?? 0.0,
+      fitrahBeras: (futures[3].first['total'] as num?)?.toDouble() ?? 0.0,
+      profesiUang: (futures[4].first['total'] as num?)?.toDouble() ?? 0.0,
+      maalUang: (futures[5].first['total'] as num?)?.toDouble() ?? 0.0,
+      fidyahUang: (futures[6].first['total'] as num?)?.toDouble() ?? 0.0,
+      countFitrah: futures[7].first['c'] as int? ?? 0,
+      countProfesi: futures[8].first['c'] as int? ?? 0,
+      countMaal: futures[9].first['c'] as int? ?? 0,
+      countFidyah: futures[10].first['c'] as int? ?? 0,
+      todayMuzakki: futures[11].first['c'] as int? ?? 0,
+      todayUang: (futures[12].first['total'] as num?)?.toDouble() ?? 0.0,
+      recentTransactions: futures[13] as List<Map<String, dynamic>>,
     );
   }
 
@@ -263,20 +325,39 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Scaffold(
         extendBody: true,
         backgroundColor: Colors.transparent,
+
         body: FutureBuilder<_DashboardData>(
           future: _dashboardFuture,
           builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: CircularProgressIndicator(color: AppColors.emeraldDeep),
+              );
+            } else if (snapshot.hasError) {
+              return Center(
+                child: Text(
+                  'Gagal memuat data dashboard: ${snapshot.error}',
+                  style: const TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              );
+            }
+
             final data = snapshot.data ?? const _DashboardData();
 
             return Stack(
               children: [
-                // LAYER 1: KONTEN UTAMA APPLICATION
                 Positioned.fill(
                   child: IndexedStack(
                     index: _selectedTab,
                     children: [
                       RefreshIndicator(
-                        onRefresh: () async => _refreshDashboard(),
+                        onRefresh: () async {
+                          await SyncService.instance.autoSync();
+                          _refreshDashboard();
+                        },
                         color: AppColors.emerald,
                         edgeOffset: topPadding + 80,
                         child: ListView(
@@ -289,9 +370,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           children: [
                             _HeroDashboardCard(
-                                  username: widget.username,
+                                  username: _currentUsername,
                                   totalUang: data.totalUang,
                                   totalBeras: data.totalBeras,
+                                  fitrahUang: data.fitrahUang,
+                                  fitrahBeras: data.fitrahBeras,
+                                  profesiUang: data.profesiUang,
+                                  maalUang: data.maalUang,
+                                  fidyahUang: data.fidyahUang,
                                   todayCount: data.todayMuzakki,
                                 )
                                 .animate()
@@ -316,6 +402,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               fitrah: data.countFitrah,
                               profesi: data.countProfesi,
                               maal: data.countMaal,
+                              fidyah: data.countFidyah,
                             ),
                             const SizedBox(height: 24),
                             _ActivityFeed(
@@ -342,16 +429,20 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         children: [
                           _ProfileTabContent(
-                            username: widget.username,
+                            username: _currentUsername,
                             email: AuthService.instance.currentUser?.email,
                             totalMuzakkiCount:
                                 data.countFitrah +
                                 data.countProfesi +
-                                data.countMaal,
+                                data.countMaal +
+                                data.countFidyah,
                             onLogout: () async =>
                                 await AuthService.instance.signOut(),
                             onDeleteAccount: () async =>
                                 await AuthService.instance.deleteAccount(),
+                            onUpdateProfile: (newName) {
+                              setState(() => _currentUsername = newName);
+                            },
                           ),
                         ],
                       ),
@@ -359,7 +450,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
 
-                // LAYER 2: TOP APP BAR MELAYANG KACA
                 Positioned(
                   top: topPadding + 12,
                   left: 20,
@@ -434,7 +524,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
 
-                // LAYER 3: TRUE NOTCHED LIQUID BAR MURNI (KETINGGIAN PROPORSIONAL)
                 Positioned(
                   bottom: 24 + bottomPadding,
                   left: 20,
@@ -445,49 +534,68 @@ class _HomeScreenState extends State<HomeScreen> {
                       borderRadius: BorderRadius.circular(32),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
+                          color: Colors.black.withValues(alpha: 0.12),
                           blurRadius: 20,
                           offset: const Offset(0, 10),
                         ),
                       ],
                     ),
-                    child: ClipPath(
-                      clipper: _CustomLiquidNotchClipper(),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 30.0, sigmaY: 30.0),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.5),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.6),
-                              width: 1.5,
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: CustomPaint(
+                            painter: _CustomLiquidNotchPainter(
+                              radius: 32.0,
+                              color: Colors.white.withValues(alpha: 0.45),
+                              notchRadius: 36.0,
                             ),
-                            borderRadius: BorderRadius.circular(32),
-                          ),
-                          child: Row(
-                            children: [
-                              _buildClassicNavItem(
-                                icon: Icons.home_rounded,
-                                label: 'Amil',
-                                isActive: _selectedTab == 0,
-                                onTap: () => setState(() => _selectedTab = 0),
-                              ),
-                              const SizedBox(width: 80),
-                              _buildClassicNavItem(
-                                icon: Icons.person_rounded,
-                                label: 'Profile',
-                                isActive: _selectedTab == 1,
-                                onTap: () => setState(() => _selectedTab = 1),
-                              ),
-                            ],
                           ),
                         ),
-                      ),
+                        Positioned.fill(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(32),
+                            child: BackdropFilter(
+                              filter: ImageFilter.blur(
+                                sigmaX: 30.0,
+                                sigmaY: 30.0,
+                              ),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.transparent,
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.5),
+                                    width: 1.5,
+                                  ),
+                                  borderRadius: BorderRadius.circular(32),
+                                ),
+                                child: Row(
+                                  children: [
+                                    _buildClassicNavItem(
+                                      icon: Icons.home_rounded,
+                                      label: 'Amil',
+                                      isActive: _selectedTab == 0,
+                                      onTap: () =>
+                                          setState(() => _selectedTab = 0),
+                                    ),
+                                    const SizedBox(width: 80),
+                                    _buildClassicNavItem(
+                                      icon: Icons.person_rounded,
+                                      label: 'Profile',
+                                      isActive: _selectedTab == 1,
+                                      onTap: () =>
+                                          setState(() => _selectedTab = 1),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
 
-                // LAYER 4: FAB LAYER PALING ATAS (FIX HIT-BOX)
                 Positioned(
                   bottom: 24 + bottomPadding + 32,
                   left: 0,
@@ -525,37 +633,40 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
 
-                // LAYER 5: NETWORK BANNER
                 AnimatedPositioned(
                   duration: const Duration(milliseconds: 300),
                   curve: Curves.easeInOut,
                   bottom: 110 + bottomPadding,
                   left: 30,
                   right: 30,
-                  child:
-                      Container(
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: _isOnline
-                                  ? Colors.green.shade700
-                                  : Colors.black87,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              _isOnline
-                                  ? 'Kembali online'
-                                  : 'Tidak ada koneksi internet',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
+                  child: IgnorePointer(
+                    child:
+                        Container(
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: _isOnline
+                                    ? Colors.green.shade700
+                                    : Colors.black87,
+                                borderRadius: BorderRadius.circular(16),
                               ),
-                            ),
-                          )
-                          .animate(target: (!_isOnline || _wasOffline) ? 1 : 0)
-                          .fade(duration: 200.ms)
-                          .slideY(begin: 1, end: 0),
+                              alignment: Alignment.center,
+                              child: Text(
+                                _isOnline
+                                    ? 'Kembali online'
+                                    : 'Tidak ada koneksi internet',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            )
+                            .animate(
+                              target: (!_isOnline || _wasOffline) ? 1 : 0,
+                            )
+                            .fade(duration: 200.ms)
+                            .slideY(begin: 1, end: 0),
+                  ),
                 ),
               ],
             );
@@ -566,80 +677,129 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _CustomLiquidNotchClipper extends CustomClipper<Path> {
+class _CustomLiquidNotchPainter extends CustomPainter {
+  final double radius;
+  final Color color;
+  final double notchRadius;
+  _CustomLiquidNotchPainter({
+    required this.radius,
+    required this.color,
+    required this.notchRadius,
+  });
   @override
-  Path getClip(Size size) {
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
     final path = Path();
     final double w = size.width;
     final double h = size.height;
-    final double r = 32.0;
 
-    path.moveTo(r, 0);
-    path.lineTo(w / 2 - 46, 0);
-    path.cubicTo(w / 2 - 26, 0, w / 2 - 30, h * 0.68, w / 2, h * 0.68);
-    path.cubicTo(w / 2 + 30, h * 0.68, w / 2 + 26, 0, w / 2 + 46, 0);
-    path.lineTo(w - r, 0);
-    path.arcToPoint(Offset(w, r), radius: Radius.circular(r), clockwise: true);
-    path.lineTo(w, h - r);
+    path.moveTo(radius, 0);
+    path.lineTo(w / 2 - notchRadius - 10, 0);
+    path.cubicTo(
+      w / 2 - notchRadius,
+      0,
+      w / 2 - notchRadius + 6,
+      h * 0.72,
+      w / 2,
+      h * 0.72,
+    );
+    path.cubicTo(
+      w / 2 + notchRadius - 6,
+      h * 0.72,
+      w / 2 + notchRadius,
+      0,
+      w / 2 + notchRadius + 10,
+      0,
+    );
+
+    path.lineTo(w - radius, 0);
     path.arcToPoint(
-      Offset(w - r, h),
-      radius: Radius.circular(r),
+      Offset(w, radius),
+      radius: Radius.circular(radius),
       clockwise: true,
     );
-    path.lineTo(r, h);
+    path.lineTo(w, h - radius);
     path.arcToPoint(
-      Offset(0, h - r),
-      radius: Radius.circular(r),
+      Offset(w - radius, h),
+      radius: Radius.circular(radius),
       clockwise: true,
     );
-    path.lineTo(0, r);
-    path.arcToPoint(Offset(r, 0), radius: Radius.circular(r), clockwise: true);
+    path.lineTo(radius, h);
+    path.arcToPoint(
+      Offset(0, h - radius),
+      radius: Radius.circular(radius),
+      clockwise: true,
+    );
+    path.lineTo(0, radius);
+    path.arcToPoint(
+      Offset(radius, 0),
+      radius: Radius.circular(radius),
+      clockwise: true,
+    );
     path.close();
-    return path;
+    canvas.drawPath(path, paint);
   }
 
   @override
-  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+  bool shouldReclip(covariant CustomPainter oldClipper) => false;
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-// ============================================================================
-// WIDGET KOMPONEN PEMBANTU (MURNI EMERALD DESIGN)
-// ============================================================================
-
-class _HeroDashboardCard extends StatelessWidget {
+class _HeroDashboardCard extends StatefulWidget {
   final String username;
   final double totalUang;
   final double totalBeras;
+  final double fitrahUang;
+  final double fitrahBeras;
+  final double profesiUang;
+  final double maalUang;
+  final double fidyahUang;
   final int todayCount;
+
   const _HeroDashboardCard({
     required this.username,
     required this.totalUang,
     required this.totalBeras,
+    required this.fitrahUang,
+    required this.fitrahBeras,
+    required this.profesiUang,
+    required this.maalUang,
+    required this.fidyahUang,
     required this.todayCount,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final currencyFormat = NumberFormat.currency(
-      locale: 'id_ID',
-      symbol: 'Rp ',
-      decimalDigits: 0,
-    );
+  State<_HeroDashboardCard> createState() => _HeroDashboardCardState();
+}
+
+class _HeroDashboardCardState extends State<_HeroDashboardCard> {
+  final PageController _pageController = PageController();
+  int _currentPage = 0;
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  Widget _buildCardSlide({
+    required String title,
+    required String valueUang,
+    String? valueBeras,
+    required List<Color> colors,
+    required IconData icon,
+  }) {
     return Container(
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.emeraldDeep, AppColors.emerald],
+        gradient: LinearGradient(
+          colors: colors,
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.emerald.withValues(alpha: 0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
       ),
       child: Stack(
         children: [
@@ -647,7 +807,7 @@ class _HeroDashboardCard extends StatelessWidget {
             right: -15,
             top: -15,
             child: Icon(
-              Icons.account_balance_wallet_rounded,
+              icon,
               size: 130,
               color: Colors.white.withValues(alpha: 0.08),
             ),
@@ -660,25 +820,29 @@ class _HeroDashboardCard extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Assalamu\'alaikum,',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.75),
-                            fontSize: 13,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Assalamu\'alaikum,',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.75),
+                              fontSize: 13,
+                            ),
                           ),
-                        ),
-                        Text(
-                          username,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 19,
-                            fontWeight: FontWeight.w900,
+                          Text(
+                            widget.username,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -698,7 +862,7 @@ class _HeroDashboardCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            '$todayCount Hari Ini',
+                            '${widget.todayCount} Hari Ini',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 11,
@@ -710,61 +874,141 @@ class _HeroDashboardCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 28),
-                const Text(
-                  'TOTAL KAS TERKUMPUL',
-                  style: TextStyle(
+                const Spacer(),
+                Text(
+                  title,
+                  style: const TextStyle(
                     color: Colors.white70,
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: FontWeight.w800,
-                    letterSpacing: 1.2,
+                    letterSpacing: 1.1,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
-                  currencyFormat.format(totalUang),
+                  valueUang,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 34,
+                    fontSize: 32,
                     fontWeight: FontWeight.w900,
                     letterSpacing: -0.5,
                   ),
                 ),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.rice_bowl_rounded,
-                        color: AppColors.gold,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Sembako Beras: ${totalBeras.toStringAsFixed(1)} Kg',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
+                if (valueBeras != null) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.rice_bowl_rounded,
+                          color: AppColors.gold,
+                          size: 15,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 6),
+                        Text(
+                          valueBeras,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final currencyFormat = NumberFormat.currency(
+      locale: 'id_ID',
+      symbol: 'Rp ',
+      decimalDigits: 0,
+    );
+
+    final slides = [
+      _buildCardSlide(
+        title: 'TOTAL SEMUA ZAKAT',
+        valueUang: currencyFormat.format(widget.totalUang),
+        valueBeras: 'Sembako Beras: ${widget.totalBeras.toStringAsFixed(1)} Kg',
+        colors: [AppColors.emeraldDeep, AppColors.emerald],
+        icon: Icons.account_balance_wallet_rounded,
+      ),
+      _buildCardSlide(
+        title: 'TOTAL ZAKAT FITRAH',
+        valueUang: currencyFormat.format(widget.fitrahUang),
+        valueBeras: 'Beras Fitrah: ${widget.fitrahBeras.toStringAsFixed(1)} Kg',
+        colors: [AppColors.emeraldDeep, Colors.teal.shade700],
+        icon: Icons.rice_bowl_rounded,
+      ),
+      _buildCardSlide(
+        title: 'TOTAL ZAKAT PROFESI',
+        valueUang: currencyFormat.format(widget.profesiUang),
+        colors: [AppColors.emeraldDeep, AppColors.orangeGold],
+        icon: Icons.work_outline_rounded,
+      ),
+      _buildCardSlide(
+        title: 'TOTAL ZAKAT MAAL',
+        valueUang: currencyFormat.format(widget.maalUang),
+        colors: [AppColors.emeraldDeep, AppColors.gold],
+        icon: Icons.account_balance_rounded,
+      ),
+      _buildCardSlide(
+        title: 'TOTAL DANA FIDYAH',
+        valueUang: currencyFormat.format(widget.fidyahUang),
+        colors: [AppColors.emeraldDeep, Colors.purple.shade700],
+        icon: Icons.calendar_today_rounded,
+      ),
+    ];
+
+    return Column(
+      children: [
+        SizedBox(
+          height: 195,
+          child: PageView(
+            controller: _pageController,
+            onPageChanged: (index) => setState(() => _currentPage = index),
+            children: slides,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(
+            slides.length,
+            (index) => AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              width: _currentPage == index ? 16 : 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: _currentPage == index
+                    ? AppColors.emeraldDeep
+                    : Colors.grey.shade400,
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -780,15 +1024,15 @@ class _ActionGrid extends StatelessWidget {
       children: [
         Expanded(
           child: _BeautifulActionTile(
-            icon: Icons.calculate_rounded,
-            title: 'Hitung\nFidyah',
+            icon: Icons.insights_rounded,
+            title: 'Cek\nNisab',
             iconColor: Colors.purple,
             bgColor: Colors.purple.withValues(alpha: 0.08),
             onTap: () => showModalBottomSheet(
               context: context,
               isScrollControlled: true,
               backgroundColor: Colors.transparent,
-              builder: (ctx) => const _FidyahModal(),
+              builder: (ctx) => const _NisabModal(),
             ),
           ),
         ),
@@ -897,24 +1141,27 @@ class _DistributionMiniChart extends StatelessWidget {
   final int fitrah;
   final int profesi;
   final int maal;
+  final int fidyah;
   const _DistributionMiniChart({
     required this.fitrah,
     required this.profesi,
     required this.maal,
+    required this.fidyah,
   });
 
   @override
   Widget build(BuildContext context) {
-    final int total = fitrah + profesi + maal;
+    final int total = fitrah + profesi + maal + fidyah;
     final int flexFitrah = total > 0 ? ((fitrah / total) * 100).round() : 0;
     final int flexProfesi = total > 0 ? ((profesi / total) * 100).round() : 0;
     final int flexMaal = total > 0 ? ((maal / total) * 100).round() : 0;
+    final int flexFidyah = total > 0 ? ((fidyah / total) * 100).round() : 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Metrik Sebaran Zakat',
+          'Metrik Sebaran Zakat & Fidyah',
           style: TextStyle(
             fontWeight: FontWeight.w900,
             fontSize: 16,
@@ -945,13 +1192,19 @@ class _DistributionMiniChart extends StatelessWidget {
                           flex: flexMaal,
                           child: Container(color: AppColors.gold),
                         ),
+                      if (flexFidyah > 0)
+                        Expanded(
+                          flex: flexFidyah,
+                          child: Container(color: Colors.purple.shade700),
+                        ),
                     ],
                   ),
           ),
         ),
         const SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Wrap(
+          spacing: 12,
+          runSpacing: 6,
           children: [
             _ChartIndicatorTag(
               label: 'Fitrah ($fitrah)',
@@ -962,6 +1215,10 @@ class _DistributionMiniChart extends StatelessWidget {
               color: AppColors.orangeGold,
             ),
             _ChartIndicatorTag(label: 'Maal ($maal)', color: AppColors.gold),
+            _ChartIndicatorTag(
+              label: 'Fidyah ($fidyah)',
+              color: Colors.purple.shade700,
+            ),
           ],
         ),
       ],
@@ -969,15 +1226,14 @@ class _DistributionMiniChart extends StatelessWidget {
   }
 }
 
-// FIX: Perbaikan Typo Parameter pada constructor _ChartIndicatorTag
 class _ChartIndicatorTag extends StatelessWidget {
   final String label;
   final Color color;
   const _ChartIndicatorTag({required this.label, required this.color});
-
   @override
   Widget build(BuildContext context) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
           width: 10,
@@ -1002,6 +1258,21 @@ class _ActivityFeed extends StatelessWidget {
   final List<Map<String, dynamic>> transactions;
   final VoidCallback onSeeAll;
   const _ActivityFeed({required this.transactions, required this.onSeeAll});
+
+  IconData _getKategoriIcon(String kategori) {
+    switch (kategori) {
+      case 'Fitrah':
+        return Icons.rice_bowl_rounded;
+      case 'Profesi':
+        return Icons.work_outline_rounded;
+      case 'Maal':
+        return Icons.account_balance_rounded;
+      case 'Fidyah':
+        return Icons.calendar_today_rounded;
+      default:
+        return Icons.payments_rounded;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1059,7 +1330,6 @@ class _ActivityFeed extends StatelessWidget {
                 tx[SqliteService.columnNamaMuzakki] ?? 'Hamba Allah';
             final String kategori =
                 tx[SqliteService.columnKategoriZakat] ?? 'Fitrah';
-            // FIX: Perbaikan Typo 'columnTypeJumlah' menjadi 'columnJumlah' murni
             final double jumlah = tx[SqliteService.columnJumlah] ?? 0.0;
             final String satuan = tx[SqliteService.columnTipeSatuan] ?? 'uang';
             final String displayJumlah = (satuan == 'beras')
@@ -1079,9 +1349,7 @@ class _ActivityFeed extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
-                        kategori == 'Fitrah'
-                            ? Icons.rice_bowl_rounded
-                            : Icons.payments_rounded,
+                        _getKategoriIcon(kategori),
                         size: 20,
                         color: AppColors.emeraldDeep,
                       ),
@@ -1133,12 +1401,14 @@ class _ProfileTabContent extends StatefulWidget {
   final int totalMuzakkiCount;
   final Future<void> Function() onLogout;
   final Future<void> Function() onDeleteAccount;
+  final Function(String) onUpdateProfile;
   const _ProfileTabContent({
     required this.username,
     required this.email,
     required this.totalMuzakkiCount,
     required this.onLogout,
     required this.onDeleteAccount,
+    required this.onUpdateProfile,
   });
   @override
   State<_ProfileTabContent> createState() => _ProfileTabContentState();
@@ -1146,6 +1416,7 @@ class _ProfileTabContent extends StatefulWidget {
 
 class _ProfileTabContentState extends State<_ProfileTabContent> {
   bool _working = false;
+
   void _showDeleteModal() {
     showModalBottomSheet(
       context: context,
@@ -1203,13 +1474,53 @@ class _ProfileTabContentState extends State<_ProfileTabContent> {
     );
   }
 
+  Widget _buildMenuTile(
+    IconData icon,
+    Color iconColor,
+    String title,
+    String subtitle,
+    VoidCallback onTap,
+  ) {
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: iconColor.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, color: iconColor),
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+      ),
+      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
+      trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+      onTap: onTap,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        SoftSurfaceCard(
-          backgroundColor: AppColors.emerald,
-          borderColor: AppColors.emerald,
+        Container(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [AppColors.emeraldDeep, AppColors.emerald],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.emerald.withValues(alpha: 0.3),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(24),
           child: Row(
             children: [
               CircleAvatar(
@@ -1314,11 +1625,12 @@ class _ProfileTabContentState extends State<_ProfileTabContent> {
             ],
           ),
         ),
+
         const SizedBox(height: 24),
         const Align(
           alignment: Alignment.centerLeft,
           child: Text(
-            'Pusat Bantuan Syariat',
+            'Pengaturan & Bantuan',
             style: TextStyle(
               color: AppColors.emeraldDeep,
               fontWeight: FontWeight.w900,
@@ -1330,33 +1642,39 @@ class _ProfileTabContentState extends State<_ProfileTabContent> {
         SoftSurfaceCard(
           backgroundColor: Colors.white.withValues(alpha: 0.9),
           padding: EdgeInsets.zero,
-          child: ListTile(
-            leading: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.indigo.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
+          child: Column(
+            children: [
+              _buildMenuTile(
+                Icons.edit_document,
+                Colors.blue.shade700,
+                'Edit Data Profil',
+                'Perbarui nama identitas amil Anda',
+                () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (ctx) => _EditProfileModal(
+                      currentName: widget.username,
+                      onSave: widget.onUpdateProfile,
+                    ),
+                  );
+                },
               ),
-              child: const Icon(
+              const Divider(height: 1, color: Colors.black12),
+              _buildMenuTile(
                 Icons.support_agent_rounded,
-                color: Colors.indigo,
+                Colors.indigo,
+                'Hotline Dewan Syariah',
+                'Konsultasi kasus fikih via WhatsApp',
+                () => _launchWithConfirmation(
+                  context,
+                  'https://wa.me/628123456789?text=Assalamu%27alaikum...',
+                  'Buka WhatsApp',
+                  'Anda akan dialihkan ke WhatsApp untuk chat dengan Hotline Syariat. Lanjutkan?',
+                ),
               ),
-            ),
-            title: const Text(
-              'Hotline Dewan Syariah',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-            ),
-            subtitle: const Text(
-              'Konsultasi kasus fikih via WhatsApp.',
-              style: TextStyle(fontSize: 12),
-            ),
-            trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-            onTap: () => _launchWithConfirmation(
-              context,
-              'https://wa.me/628123456789?text=Assalamu%27alaikum%20Dewan%20Syariah...',
-              'Buka WhatsApp',
-              'Anda akan dialihkan ke WhatsApp untuk chat dengan Hotline Syariat. Lanjutkan?',
-            ),
+            ],
           ),
         ),
         const SizedBox(height: 32),
@@ -1407,23 +1725,27 @@ class _ProfileTabContentState extends State<_ProfileTabContent> {
   }
 }
 
-class _FidyahModal extends StatefulWidget {
-  const _FidyahModal();
+class _EditProfileModal extends StatefulWidget {
+  final String currentName;
+  final Function(String) onSave;
+  const _EditProfileModal({required this.currentName, required this.onSave});
+
   @override
-  State<_FidyahModal> createState() => _FidyahModalState();
+  State<_EditProfileModal> createState() => _EditProfileModalState();
 }
 
-class _FidyahModalState extends State<_FidyahModal> {
-  final _hariController = TextEditingController();
-  double _total = 0;
-  void _hitung() {
-    final hari = int.tryParse(_hariController.text) ?? 0;
-    setState(() => _total = hari * 60000.0);
+class _EditProfileModalState extends State<_EditProfileModal> {
+  late TextEditingController _nameController;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.currentName);
   }
 
   @override
   void dispose() {
-    _hariController.dispose();
+    _nameController.dispose();
     super.dispose();
   }
 
@@ -1453,7 +1775,7 @@ class _FidyahModalState extends State<_FidyahModal> {
             ),
             const SizedBox(height: 20),
             const Text(
-              'Kalkulator Fidyah Syar\'i',
+              'Edit Data Profil',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 19,
@@ -1461,7 +1783,7 @@ class _FidyahModalState extends State<_FidyahModal> {
               ),
             ),
             const Text(
-              'Ketetapan BAZNAS: Rp 60.000 / Hari',
+              'Perbarui informasi identitas amil Anda',
               style: TextStyle(
                 color: AppColors.gold,
                 fontSize: 12,
@@ -1470,18 +1792,19 @@ class _FidyahModalState extends State<_FidyahModal> {
             ),
             const SizedBox(height: 24),
             TextField(
-              controller: _hariController,
-              keyboardType: TextInputType.number,
-              onChanged: (v) => _hitung(),
+              controller: _nameController,
               style: const TextStyle(
                 color: AppColors.gold,
                 fontWeight: FontWeight.bold,
-                fontSize: 26,
+                fontSize: 20,
               ),
-              textAlign: TextAlign.center,
               decoration: InputDecoration(
-                hintText: 'Jumlah Hari Utang Puasa',
-                hintStyle: const TextStyle(color: Colors.white30, fontSize: 15),
+                labelText: 'Nama Lengkap Baru',
+                labelStyle: const TextStyle(color: Colors.white70),
+                prefixIcon: const Icon(
+                  Icons.person_outline_rounded,
+                  color: AppColors.gold,
+                ),
                 filled: true,
                 fillColor: Colors.black26,
                 border: OutlineInputBorder(
@@ -1497,43 +1820,7 @@ class _FidyahModalState extends State<_FidyahModal> {
                 ),
               ),
             ),
-            const SizedBox(height: 24),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: Colors.white24, width: 1),
-              ),
-              child: Column(
-                children: [
-                  const Text(
-                    'KONTRIBUSI FIDYAH WAJIB',
-                    style: TextStyle(
-                      color: Colors.white60,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    NumberFormat.currency(
-                      locale: 'id_ID',
-                      symbol: 'Rp ',
-                      decimalDigits: 0,
-                    ).format(_total),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 30,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.orangeGold,
@@ -1544,15 +1831,148 @@ class _FidyahModalState extends State<_FidyahModal> {
                 ),
                 elevation: 0,
               ),
-              onPressed: () => Navigator.pop(context),
+              onPressed: () {
+                final newName = _nameController.text.trim();
+                if (newName.isNotEmpty) {
+                  widget.onSave(newName);
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Profil berhasil diperbarui!'),
+                      backgroundColor: AppColors.emerald,
+                    ),
+                  );
+                }
+              },
               child: const Text(
-                'Selesai & Catat',
+                'Simpan Perubahan',
                 style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _NisabModal extends StatelessWidget {
+  const _NisabModal();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: GlassContainer(
+        width: double.infinity,
+        borderRadius: 28,
+        padding: const EdgeInsets.all(28),
+        backgroundColor: AppColors.emeraldDeep.withValues(alpha: 0.85),
+        glassOpacity: 0.9,
+        blur: 20,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 45,
+              height: 5,
+              decoration: BoxDecoration(
+                color: Colors.white30,
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Informasi Nisab & Ketetapan',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 19,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const Text(
+              'Standar acuan yang berlaku saat ini',
+              style: TextStyle(
+                color: AppColors.gold,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(22),
+              decoration: BoxDecoration(
+                color: Colors.black12,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white12),
+              ),
+              child: Column(
+                children: [
+                  _buildInfoRow('Zakat Fitrah', 'Rp 40.000 / 2.5 Kg'),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Divider(color: Colors.white12, height: 1),
+                  ),
+                  _buildInfoRow('Zakat Profesi', 'Rp 6.859.394 / Bln'),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Divider(color: Colors.white12, height: 1),
+                  ),
+                  _buildInfoRow('Zakat Maal', 'Rp 82.312.725 / Thn'),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Divider(color: Colors.white12, height: 1),
+                  ),
+                  _buildInfoRow('Fidyah', 'Rp 60.000 / Hari'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.emerald,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 54),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 0,
+              ),
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Tutup',
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String title, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            color: AppColors.gold,
+            fontSize: 15,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1575,25 +1995,30 @@ class _RekapHarianModal extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 45,
-            height: 5,
+            width: 40,
+            height: 4,
             decoration: BoxDecoration(
               color: Colors.white30,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(2),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           const Text(
-            'Rekapitulasi Tugas Hari Ini',
+            'Rekapitulasi Hari Ini',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 19,
+              fontSize: 20,
               fontWeight: FontWeight.w900,
             ),
           ),
+          const SizedBox(height: 8),
           const Text(
-            'Data himpunan zakat real-time amil',
-            style: TextStyle(color: Colors.white60, fontSize: 12),
+            'Total perolehan selama Anda bertugas hari ini.',
+            style: TextStyle(
+              color: AppColors.gold,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 24),
           Container(
@@ -1619,8 +2044,8 @@ class _RekapHarianModal extends StatelessWidget {
                     Text(
                       '$muzakki Jiwa',
                       style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
+                        color: AppColors.gold,
+                        fontSize: 16,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
@@ -1649,7 +2074,7 @@ class _RekapHarianModal extends StatelessWidget {
                       ).format(uang),
                       style: const TextStyle(
                         color: AppColors.gold,
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
