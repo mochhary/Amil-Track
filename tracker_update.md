@@ -94,15 +94,15 @@ _Fokus: Standardisasi dan optimalisasi performa menyeluruh agar aplikasi lulus s
 
 - [x] **App Icon & Branding Native:** Mengonfigurasi package `flutter_launcher_icons` untuk memasang aset logo resmi Amil Track secara otomatis di seluruh level sistem operasi (Android & iOS).
 - [x] **Native Splash Screen Engine:** Mengonfigurasi package `flutter_native_splash` untuk membuang tampilan layar putih hampa saat aplikasi pertama kali dimuat di ponsel pengguna.
-- [ ] **Code Analysis & Linting Audit:** Menjalankan perintah analisis ketat `flutter analyze` untuk membersihkan seluruh sisa kode _warning_, _unused imports_, ataupun _deprecated code_.
-- [ ] **Production Optimization:** Mematikan _debug banner_ pojok kanan atas, menguji kestabilan memori dari kebocoran (_memory leak_), serta melakukan kompilasi rilis akhir menggunakan target _bundle_ yang optimal.
+- [x] **Code Analysis & Linting Audit:** Menjalankan perintah analisis ketat `flutter analyze` untuk membersihkan seluruh sisa kode _warning_, _unused imports_, ataupun _deprecated code_.
+- [x] **Production Optimization:** Mematikan _debug banner_ pojok kanan atas, menguji kestabilan memori dari kebocoran (_memory leak_), serta melakukan kompilasi rilis akhir menggunakan target _bundle_ yang optimal.
 
 ## ⏳ FASE 10: Optimasi Performa & Arsitektur Lanjutan (Tech Debt)
 
 _Fokus: Mengatasi potensi kerapuhan sistem (vulnerabilities) dan meningkatkan efisiensi agar aplikasi siap untuk skala pengguna masif._
 
-- [ ] **Perbaikan Kerapuhan Visual (UI Responsiveness):** Mengganti angka _hardcoded_ (magic numbers) pada `_CustomLiquidNotchClipper` dan titik absolut penempatan elemen melayang (seperti FAB) dengan perhitungan matematis dinamis menggunakan `MediaQuery` atau `LayoutBuilder` agar UI tetap presisi di berbagai ukuran dan rasio layar (termasuk tablet).
-- [ ] **Optimasi Efisiensi Query Database:** Melakukan refactoring pada fungsi `_loadDashboardData` yang saat ini menjalankan 7 query SQLite secara berurutan. Menggabungkan eksekusi menggunakan metode paralel `Future.wait([])` atau menyatukannya ke dalam satu agregasi query SQL kompleks untuk mencegah pelambatan performa (bottleneck) saat jumlah data transaksi mencapai ribuan.
-- [ ] **Pemantauan Jaringan Efisien (Network Checking):** Mengganti metode `Timer.periodic` dan `InternetAddress.lookup` yang terus-menerus berjalan dan memakan daya baterai dengan *package* `connectivity_plus`. Pendekatan _event-driven_ ini akan memantau perubahan status koneksi perangkat secara pasif tanpa harus membebani _thread_ aplikasi.
-- [ ] **Walkthrough ilang:** 
-- [ ] **Initial Cloud Pull (Two-Way Sync):** Membangun fungsi penyedot data awal yang otomatis mengunduh riwayat transaksi dari Supabase ke dalam SQLite lokal saat amil baru pertama kali login di perangkat baru.
+- [x] **Perbaikan Kerapuhan Visual (UI Responsiveness):** Mengganti angka _hardcoded_ (magic numbers) pada `_CustomLiquidNotchClipper` dan titik absolut penempatan elemen melayang (seperti FAB) dengan perhitungan matematis dinamis menggunakan `MediaQuery` atau `LayoutBuilder` agar UI tetap presisi di berbagai ukuran dan rasio layar (termasuk tablet).
+- [x] **Optimasi Efisiensi Query Database:** Melakukan refactoring pada fungsi `_loadDashboardData` yang saat ini menjalankan 7 query SQLite secara berurutan. Menggabungkan eksekusi menggunakan metode paralel `Future.wait([])` atau menyatukannya ke dalam satu agregasi query SQL kompleks untuk mencegah pelambatan performa (bottleneck) saat jumlah data transaksi mencapai ribuan.
+- [x] **Pemantauan Jaringan Efisien (Network Checking):** Mengganti metode `Timer.periodic` dan `InternetAddress.lookup` yang terus-menerus berjalan dan memakan daya baterai dengan *package* `connectivity_plus`. Pendekatan _event-driven_ ini akan memantau perubahan status koneksi perangkat secara pasif tanpa harus membebani _thread_ aplikasi.
+- [x] **Walkthrough ilang:** 
+- [x] **Initial Cloud Pull (Two-Way Sync):** Membangun fungsi penyedot data awal yang otomatis mengunduh riwayat transaksi dari Supabase ke dalam SQLite lokal saat amil baru pertama kali login di perangkat baru.

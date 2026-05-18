@@ -91,11 +91,6 @@ class WhatsappService {
         'Salam, Pengurus DKM Masjid\n'
         'Aplikasi Amil Track';
 
-    // TAMBAHKAN BARIS INI UNTUK MENGECEK ISI STRUK DI CONSOLE:
-    print('==================================================');
-    print('LOG SINKRONISASI: MESSAGING TEMPLATE GENERATED');
-    print(message);
-    print('==================================================');
     // Konversi string pesan menjadi format URL Safe (Percent-Encoding)
     final Uri whatsappUri = Uri.parse(
       'https://wa.me/$validPhone?text=${Uri.encodeComponent(message)}',

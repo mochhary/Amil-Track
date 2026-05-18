@@ -58,7 +58,7 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
   }
 
   Future<void> _pickDateRange() async {
-    final DateTimeRange? initialRange =
+    final initialRange =
         _selectedDateRange ??
         DateTimeRange(
           start: DateTime.now().subtract(const Duration(days: 7)),
@@ -177,7 +177,7 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
               leading: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppColors.emerald.withOpacity(0.1),
+                  color: AppColors.emerald.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -211,7 +211,7 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
               leading: Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
+                  color: Colors.blue.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.share_rounded, color: Colors.blue),
@@ -240,7 +240,6 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
     );
   }
 
-  // FUNGSI LOGIKA PEMICU DIALOG KONFIRMASI WHATSAPP
   void _triggerWhatsappDialog(
     BuildContext context,
     Map<String, dynamic> tx,
@@ -447,8 +446,9 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               onSelected: (val) {
-                                if (val)
+                                if (val) {
                                   setState(() => _selectedFilter = filter);
+                                }
                               },
                             ),
                           );
@@ -540,125 +540,128 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                             : currencyFormat.format(jumlah);
 
                         return Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: SoftSurfaceCard(
-                            backgroundColor: Colors.white,
-                            padding: EdgeInsets
-                                .zero, // Set ke nol agar InkWell bisa memenuhi seluruh ruang kartu
-                            child: Material(
-                              color: Colors
-                                  .transparent, // Agar background putih SoftSurfaceCard tetap terlihat
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(
-                                  16,
-                                ), // Samakan lekukan dengan card
-                                onTap: () {
-                                  // UX HINT: Jika diklik singkat, beri tahu lewat SnackBar bahwa menu ini butuh ditekan lama
-                                  ScaffoldMessenger.of(
-                                    context,
-                                  ).hideCurrentSnackBar();
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Petunjuk: Tahan lama (long press) untuk mengirim kwitansi WhatsApp',
-                                      ),
-                                      duration: Duration(seconds: 2),
-                                      backgroundColor: AppColors.emeraldDeep,
-                                    ),
-                                  );
-                                },
-                                onLongPress: () =>
-                                    _triggerWhatsappDialog(context, tx, nama),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(
-                                    16.0,
-                                  ), // Kembalikan padding ke dalam InkWell
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(12),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.softSurface,
-                                          borderRadius: BorderRadius.circular(
-                                            14,
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: SoftSurfaceCard(
+                                backgroundColor: Colors.white,
+                                padding: EdgeInsets.zero,
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(16),
+                                    onTap: () {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).hideCurrentSnackBar();
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Petunjuk: Tahan lama (long press) untuk mengirim kwitansi WhatsApp',
                                           ),
+                                          duration: Duration(seconds: 2),
+                                          backgroundColor:
+                                              AppColors.emeraldDeep,
                                         ),
-                                        child: Icon(
-                                          _getKategoriIcon(kategori),
-                                          size: 22,
-                                          color: AppColors.emeraldDeep,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 14),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              nama,
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.w900,
-                                                fontSize: 15,
-                                                color: AppColors.textPrimary,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              'Zakat $kategori • $displayDate',
-                                              style: const TextStyle(
-                                                fontSize: 11,
-                                                color: AppColors.textSecondary,
-                                                fontWeight: FontWeight.w500,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.end,
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
+                                      );
+                                    },
+                                    onLongPress: () => _triggerWhatsappDialog(
+                                      context,
+                                      tx,
+                                      nama,
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(16.0),
+                                      child: Row(
                                         children: [
-                                          Text(
-                                            displayJumlah,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w900,
-                                              fontSize: 15,
+                                          Container(
+                                            padding: const EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.softSurface,
+                                              borderRadius:
+                                                  BorderRadius.circular(14),
+                                            ),
+                                            child: Icon(
+                                              _getKategoriIcon(kategori),
+                                              size: 22,
                                               color: AppColors.emeraldDeep,
                                             ),
                                           ),
-                                          const SizedBox(height: 4),
-                                          // SIGN VISUAL: Ikon chat kecil abu-abu sebagai penanda data bisa dikirim ke WA
-                                          const Row(
-                                            children: [
-                                              Icon(
-                                                Icons
-                                                    .chat_bubble_outline_rounded,
-                                                size: 11,
-                                                color: Colors.grey,
-                                              ),
-                                              SizedBox(width: 3),
-                                              Text(
-                                                'WhatsApp Struk',
-                                                style: TextStyle(
-                                                  fontSize: 10,
-                                                  color: Colors.grey,
-                                                  fontWeight: FontWeight.bold,
+                                          const SizedBox(width: 14),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  nama,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w900,
+                                                    fontSize: 15,
+                                                    color:
+                                                        AppColors.textPrimary,
+                                                  ),
                                                 ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  'Zakat $kategori • $displayDate',
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                    color:
+                                                        AppColors.textSecondary,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.end,
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Text(
+                                                displayJumlah,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w900,
+                                                  fontSize: 15,
+                                                  color: AppColors.emeraldDeep,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              const Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons
+                                                        .chat_bubble_outline_rounded,
+                                                    size: 11,
+                                                    color: Colors.grey,
+                                                  ),
+                                                  SizedBox(width: 3),
+                                                  Text(
+                                                    'WhatsApp Struk',
+                                                    style: TextStyle(
+                                                      fontSize: 10,
+                                                      color: Colors.grey,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                             ],
                                           ),
                                         ],
                                       ),
-                                    ],
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ),
-                        ).animate().fade(duration: 200.ms, delay: (index * 40).ms).slideX(begin: 0.02);
+                            )
+                            .animate()
+                            .fade(duration: 200.ms, delay: (index * 40).ms)
+                            .slideX(begin: 0.02);
                       },
                     ),
                     Positioned(
@@ -671,8 +674,8 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                               borderRadius: BorderRadius.circular(18),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.emeraldDeep.withOpacity(
-                                    0.25,
+                                  color: AppColors.emeraldDeep.withValues(
+                                    alpha: 0.25,
                                   ),
                                   blurRadius: 15,
                                   offset: const Offset(0, 6),

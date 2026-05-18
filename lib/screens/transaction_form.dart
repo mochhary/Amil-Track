@@ -1,4 +1,4 @@
-import 'dart:ui';
+// ignore_for_file: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -6,7 +6,6 @@ import 'package:intl/intl.dart';
 
 import '../core/constants.dart';
 import '../services/sqlite_service.dart';
-import '../services/sync_service.dart';
 
 class CurrencyInputFormatter extends TextInputFormatter {
   @override
@@ -155,13 +154,10 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
             : 'uang',
         SqliteService.columnJumlahJiwa: jumlahJiwaData,
         SqliteService.columnCreatedAt: DateTime.now().toIso8601String(),
-        SqliteService.columnSyncStatus:
-            0, // Set status 0, timer yang akan handle pengiriman!
+        SqliteService.columnSyncStatus: 0,
       };
 
       await db.insert(SqliteService.tableTransactions, txRow);
-
-      // FIX: Kita biarkan Timer 4-Detik yang men-sync datanya, agar tidak balapan (double)
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -182,7 +178,9 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
         );
       }
     } finally {
-      if (mounted) setState(() => _isSaving = false);
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 

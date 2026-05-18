@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-
 class ZakatCalculator {
   // Batas persentase zakat maal & profesi menurut syariat
   static const double zakatRateMultiplier = 0.025; // 2.5%
@@ -11,7 +9,7 @@ class ZakatCalculator {
   /// Rumus: Jumlah Jiwa x Nisab Per Jiwa (Beras: 2.5 Kg atau Uang: Harga Beras x 2.5)
   static Map<String, dynamic> calculateFitrah({
     required int jumlahJiwa,
-    required double hargaBerasAcuan, 
+    required double hargaBerasAcuan,
     required bool bayarPakaiUang,
   }) {
     if (jumlahJiwa <= 0) {
@@ -19,7 +17,7 @@ class ZakatCalculator {
     }
 
     // Standar BAZNAS: Nisab per jiwa adalah 2.5 Kg beras
-    const double nisabBerasPerJiwa = 2.5; 
+    const double nisabBerasPerJiwa = 2.5;
 
     if (bayarPakaiUang) {
       final double totalUang = jumlahJiwa * nisabBerasPerJiwa * hargaBerasAcuan;
@@ -42,12 +40,14 @@ class ZakatCalculator {
     required double hargaEmasPerGramAcuan,
   }) {
     final double totalPendapatanKotor = pendapatanPerBulan + bonusAtauLainnya;
-    
+
     // Standar BAZNAS: Nisab tahunan = 85 gram emas. Nisab bulanan = (85 gram / 12 bulan)
     final double nisabBulananUang = (85 * hargaEmasPerGramAcuan) / 12;
 
     final bool wajibZakat = totalPendapatanKotor >= nisabBulananUang;
-    final double totalZakat = wajibZakat ? (totalPendapatanKotor * zakatRateMultiplier) : 0.0;
+    final double totalZakat = wajibZakat
+        ? (totalPendapatanKotor * zakatRateMultiplier)
+        : 0.0;
 
     return {
       'isWajib': wajibZakat,
@@ -79,13 +79,17 @@ class ZakatCalculator {
     final double nisabMaalUang = 85 * hargaEmasPerGramAcuan;
 
     final bool wajibZakat = totalNilaiAset >= nisabMaalUang;
-    final double totalZakat = wajibZakat ? (totalNilaiAset * zakatRateMultiplier) : 0.0;
+    final double totalZakat = wajibZakat
+        ? (totalNilaiAset * zakatRateMultiplier)
+        : 0.0;
 
     return {
       'isWajib': wajibZakat,
       'nisabAset': nisabMaalUang,
       'totalZakat': totalZakat,
-      'alasan': wajibZakat ? 'Wajib zakat terwujud' : 'Total aset belum mencapai batas Nisab',
+      'alasan': wajibZakat
+          ? 'Wajib zakat terwujud'
+          : 'Total aset belum mencapai batas Nisab',
     };
   }
 }

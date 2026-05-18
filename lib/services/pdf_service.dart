@@ -1,6 +1,6 @@
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart'; // TAMBAHAN UNTUK DEBUG PRINT
 import 'package:intl/intl.dart';
-import 'package:intl/date_symbol_data_local.dart'; // FIX 1: Import kamus bahasa lokal
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -11,7 +11,7 @@ class PdfService {
     required String amilName,
     required String filterName,
   }) async {
-    // FIX 2: Menghidupkan mesin kalender Bahasa Indonesia sebelum membuat PDF
+    // Menghidupkan mesin kalender Bahasa Indonesia sebelum membuat PDF
     await initializeDateFormatting('id_ID', null);
 
     final pdf = pw.Document();
@@ -22,7 +22,7 @@ class PdfService {
         'assets/images/logo_amil_track.png',
       );
     } catch (e) {
-      print('⚠️ Logo gagal dimuat ke PDF: $e');
+      debugPrint('⚠️ Logo gagal dimuat ke PDF: $e');
     }
 
     final currencyFormat = NumberFormat.currency(

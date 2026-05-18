@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart'; // TAMBAHAN UNTUK DEBUG PRINT
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'sqlite_service.dart';
 
@@ -92,7 +93,7 @@ class SyncService {
         }
       }
     } catch (e) {
-      print('🛑 [AUTO-SYNC ERROR]: $e');
+      debugPrint('[AUTO-SYNC ERROR]: $e'); // UBAH KE DEBUGPRINT
     } finally {
       _isSyncing = false;
     }

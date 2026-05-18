@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 
 import '../core/constants.dart';
 import '../widgets/soft_surface_card.dart';
@@ -102,10 +104,11 @@ Future<void> _launchWithConfirmation(
   if (confirm == true) {
     final Uri url = Uri.parse(urlString);
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-      if (context.mounted)
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Gagal membuka tautan eksternal.')),
         );
+      }
     }
   }
 }
@@ -122,52 +125,282 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedTab = 0;
   bool _isOnline = true;
   bool _wasOffline = false;
-  Timer? _networkTimer;
   late String _currentUsername;
+
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+
+  // KEY UNTUK TUTORIAL COACH MARK (5 Langkah Komprehensif)
+  final GlobalKey _heroKey = GlobalKey();
+  final GlobalKey _toolsKey = GlobalKey();
+  final GlobalKey _chartKey = GlobalKey();
+  final GlobalKey _navKey = GlobalKey();
+  final GlobalKey _fabKey = GlobalKey();
+  bool _hasShownTutorial = false;
 
   @override
   void initState() {
     super.initState();
     _currentUsername = widget.username;
 
-    // 1. RENDER INSTAN: Langsung tampilkan memori lokal (Offline-First) agar UI cepat
-    _dashboardFuture = _loadDashboardData();
-
-    // 2. KEAJAIBAN AWAL: Tarik data dari Supabase secara siluman, lalu auto-refresh UI
+    _loadAndCheckTutorial();
     _initialMagicSync();
 
-    // 3. RADAR AUTO-SYNC: Jalan setiap 4 detik untuk mengecek jika ada data baru
-    _networkTimer = Timer.periodic(
-      const Duration(seconds: 4),
-      (_) => _backgroundSync(),
-    );
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
+      List<ConnectivityResult> results,
+    ) {
+      if (results.contains(ConnectivityResult.none)) {
+        if (_isOnline && mounted) {
+          setState(() => _isOnline = false);
+        }
+      } else {
+        _backgroundSync();
+      }
+    });
   }
 
   @override
   void dispose() {
-    _networkTimer?.cancel();
+    _connectivitySubscription?.cancel();
     super.dispose();
   }
 
-  // Fungsi khusus untuk sinkronisasi pertama kali buka aplikasi
+  void _loadAndCheckTutorial() {
+    _dashboardFuture = _loadDashboardData();
+    _dashboardFuture.then((data) {
+      final int totalSemua =
+          data.countFitrah +
+          data.countProfesi +
+          data.countMaal +
+          data.countFidyah;
+      if (totalSemua == 0 && !_hasShownTutorial && mounted) {
+        _hasShownTutorial = true;
+        Future.delayed(const Duration(milliseconds: 600), () {
+          if (mounted && _selectedTab == 0) {
+            _showTutorial();
+          }
+        });
+      }
+    });
+  }
+
+  void _showTutorial() {
+    TutorialCoachMark(
+      targets: _createTutorialTargets(),
+      colorShadow: AppColors.emeraldDeep,
+      textSkip: "LEWATI",
+      paddingFocus: 10.0,
+      opacityShadow: 0.88,
+      onFinish: () {},
+      onClickTarget: (target) {},
+      onClickOverlay: (target) {},
+      onSkip: () => true,
+    ).show(context: context);
+  }
+
+  // CETAK BIRU TUTORIAL 5 LANGKAH (Teks diatur agar jatuh di area gelap)
+  List<TargetFocus> _createTutorialTargets() {
+    return [
+      TargetFocus(
+        identify: "heroKey",
+        keyTarget: _heroKey,
+        alignSkip: Alignment.topRight,
+        shape: ShapeLightFocus.RRect,
+        radius: 24.0,
+        contents: [
+          TargetContent(
+            align: ContentAlign.bottom, // Area gelap di bawah kartu
+            builder: (context, controller) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    "1. Ringkasan Saldo",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 20,
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                  Text(
+                    "Ini adalah kartu saldo utama Anda. Anda bisa MENGGESER kartu ini ke kiri/kanan untuk melihat total perolehan spesifik dari setiap kategori Zakat.",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+      TargetFocus(
+        identify: "toolsKey",
+        keyTarget: _toolsKey,
+        alignSkip: Alignment.topRight,
+        shape: ShapeLightFocus.RRect,
+        radius: 24.0,
+        contents: [
+          TargetContent(
+            align: ContentAlign.bottom, // Area gelap di bawah kotak alat
+            builder: (context, controller) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    "2. Peralatan Pintar",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 20,
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                  Text(
+                    "Gunakan menu ini untuk mengecek harga Nisab terkini, mengirim rekap harian ke koordinator, atau membaca panduan Fikih resmi BAZNAS.",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+      TargetFocus(
+        identify: "chartKey",
+        keyTarget: _chartKey,
+        alignSkip: Alignment.topRight,
+        shape: ShapeLightFocus.RRect,
+        radius: 16.0,
+        paddingFocus: 4.0, // Mengetatkan sorotan
+        contents: [
+          TargetContent(
+            align: ContentAlign
+                .top, // Area gelap di ATAS chart (terhindar dari sorotan putih)
+            builder: (context, controller) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    "3. Metrik Visual",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 20,
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                  Text(
+                    "Pantau persentase sebaran penerimaan zakat secara sekilas melalui indikator warna ini. Bar warna akan otomatis menyesuaikan diri seiring bertambahnya data.",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+      TargetFocus(
+        identify: "navKey",
+        keyTarget: _navKey,
+        alignSkip: Alignment.topRight,
+        shape: ShapeLightFocus.RRect,
+        radius: 32.0,
+        contents: [
+          TargetContent(
+            align: ContentAlign.top, // Area gelap di atas Navbar
+            builder: (context, controller) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    "4. Profil & Pengaturan",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 20,
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                  Text(
+                    "Beralih ke tab ini untuk mengelola akun Anda, mengubah nama identitas amil, dan melihat total rekam jejak pengabdian secara personal.",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+      TargetFocus(
+        identify: "fabKey",
+        keyTarget: _fabKey,
+        alignSkip: Alignment.topRight,
+        contents: [
+          TargetContent(
+            align: ContentAlign.top, // Area gelap di atas tombol Plus (+)
+            builder: (context, controller) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    "5. Catat Setoran Zakat",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 20,
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                  Text(
+                    "Tekan tombol ini setiap kali ada Muzakki yang menyerahkan Zakat/Fidyah. Mari kita mulai menggunakan Amil Track!",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    ];
+  }
+
   Future<void> _initialMagicSync() async {
     try {
       final result = await InternetAddress.lookup('google.com');
       if (result.isNotEmpty && result[0].rawAddress.isNotEmpty) {
         if (mounted) setState(() => _isOnline = true);
-
         bool hasNewData = await SyncService.instance.autoSync();
-        // AUTO REFRESH: Jika ada data dari Supabase (misal sehabis install ulang), layar langsung update!
-        if (hasNewData && mounted) {
-          _refreshDashboard();
-        }
+        if (hasNewData && mounted) _refreshDashboard();
       }
     } catch (_) {
       if (mounted) setState(() => _isOnline = false);
     }
   }
 
-  // Fungsi pengawas latar belakang setiap 4 detik
   Future<void> _backgroundSync() async {
     try {
       final result = await InternetAddress.lookup('google.com');
@@ -181,11 +414,8 @@ class _HomeScreenState extends State<HomeScreen> {
             if (mounted) setState(() => _wasOffline = false);
           });
         }
-
         bool hasNewData = await SyncService.instance.autoSync();
-        if (hasNewData && mounted) {
-          _refreshDashboard(); // Layar akan terbarui otomatis jika ada data baru masuk dari awan
-        }
+        if (hasNewData && mounted) _refreshDashboard();
       }
     } catch (_) {
       if (_isOnline && mounted) setState(() => _isOnline = false);
@@ -204,46 +434,27 @@ class _HomeScreenState extends State<HomeScreen> {
     final db = await SqliteService.instance.database;
     final todayStr = DateTime.now().toIso8601String().substring(0, 10);
 
+    final String aggregateQuery =
+        '''
+      SELECT 
+        SUM(CASE WHEN ${SqliteService.columnTipeSatuan} = 'uang' THEN ${SqliteService.columnJumlah} ELSE 0 END) as totalUang,
+        SUM(CASE WHEN ${SqliteService.columnTipeSatuan} = 'beras' THEN ${SqliteService.columnJumlah} ELSE 0 END) as totalBeras,
+        SUM(CASE WHEN ${SqliteService.columnKategoriZakat} = 'Fitrah' AND ${SqliteService.columnTipeSatuan} = 'uang' THEN ${SqliteService.columnJumlah} ELSE 0 END) as fitrahUang,
+        SUM(CASE WHEN ${SqliteService.columnKategoriZakat} = 'Fitrah' AND ${SqliteService.columnTipeSatuan} = 'beras' THEN ${SqliteService.columnJumlah} ELSE 0 END) as fitrahBeras,
+        SUM(CASE WHEN ${SqliteService.columnKategoriZakat} = 'Profesi' THEN ${SqliteService.columnJumlah} ELSE 0 END) as profesiUang,
+        SUM(CASE WHEN ${SqliteService.columnKategoriZakat} = 'Maal' THEN ${SqliteService.columnJumlah} ELSE 0 END) as maalUang,
+        SUM(CASE WHEN ${SqliteService.columnKategoriZakat} = 'Fidyah' THEN ${SqliteService.columnJumlah} ELSE 0 END) as fidyahUang,
+        SUM(CASE WHEN ${SqliteService.columnKategoriZakat} = 'Fitrah' THEN 1 ELSE 0 END) as countFitrah,
+        SUM(CASE WHEN ${SqliteService.columnKategoriZakat} = 'Profesi' THEN 1 ELSE 0 END) as countProfesi,
+        SUM(CASE WHEN ${SqliteService.columnKategoriZakat} = 'Maal' THEN 1 ELSE 0 END) as countMaal,
+        SUM(CASE WHEN ${SqliteService.columnKategoriZakat} = 'Fidyah' THEN 1 ELSE 0 END) as countFidyah,
+        SUM(CASE WHEN ${SqliteService.columnCreatedAt} LIKE '$todayStr%' THEN 1 ELSE 0 END) as todayMuzakki,
+        SUM(CASE WHEN ${SqliteService.columnTipeSatuan} = 'uang' AND ${SqliteService.columnCreatedAt} LIKE '$todayStr%' THEN ${SqliteService.columnJumlah} ELSE 0 END) as todayUang
+      FROM ${SqliteService.tableTransactions}
+    ''';
+
     final futures = await Future.wait([
-      db.rawQuery(
-        'SELECT SUM(${SqliteService.columnJumlah}) as total FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnTipeSatuan} = "uang"',
-      ),
-      db.rawQuery(
-        'SELECT SUM(${SqliteService.columnJumlah}) as total FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnTipeSatuan} = "beras"',
-      ),
-      db.rawQuery(
-        'SELECT SUM(${SqliteService.columnJumlah}) as total FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnKategoriZakat} = "Fitrah" AND ${SqliteService.columnTipeSatuan} = "uang"',
-      ),
-      db.rawQuery(
-        'SELECT SUM(${SqliteService.columnJumlah}) as total FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnKategoriZakat} = "Fitrah" AND ${SqliteService.columnTipeSatuan} = "beras"',
-      ),
-      db.rawQuery(
-        'SELECT SUM(${SqliteService.columnJumlah}) as total FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnKategoriZakat} = "Profesi"',
-      ),
-      db.rawQuery(
-        'SELECT SUM(${SqliteService.columnJumlah}) as total FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnKategoriZakat} = "Maal"',
-      ),
-      db.rawQuery(
-        'SELECT SUM(${SqliteService.columnJumlah}) as total FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnKategoriZakat} = "Fidyah"',
-      ),
-      db.rawQuery(
-        'SELECT COUNT(*) as c FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnKategoriZakat} = "Fitrah"',
-      ),
-      db.rawQuery(
-        'SELECT COUNT(*) as c FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnKategoriZakat} = "Profesi"',
-      ),
-      db.rawQuery(
-        'SELECT COUNT(*) as c FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnKategoriZakat} = "Maal"',
-      ),
-      db.rawQuery(
-        'SELECT COUNT(*) as c FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnKategoriZakat} = "Fidyah"',
-      ),
-      db.rawQuery(
-        "SELECT COUNT(*) as c FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnCreatedAt} LIKE '$todayStr%'",
-      ),
-      db.rawQuery(
-        "SELECT SUM(${SqliteService.columnJumlah}) as total FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnTipeSatuan} = 'uang' AND ${SqliteService.columnCreatedAt} LIKE '$todayStr%'",
-      ),
+      db.rawQuery(aggregateQuery),
       db.query(
         SqliteService.tableTransactions,
         orderBy: '${SqliteService.columnCreatedAt} DESC',
@@ -251,21 +462,24 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     ]);
 
+    final agg = futures[0].isNotEmpty ? futures[0].first : {};
+    final recentTransactions = futures[1] as List<Map<String, dynamic>>;
+
     return _DashboardData(
-      totalUang: (futures[0].first['total'] as num?)?.toDouble() ?? 0.0,
-      totalBeras: (futures[1].first['total'] as num?)?.toDouble() ?? 0.0,
-      fitrahUang: (futures[2].first['total'] as num?)?.toDouble() ?? 0.0,
-      fitrahBeras: (futures[3].first['total'] as num?)?.toDouble() ?? 0.0,
-      profesiUang: (futures[4].first['total'] as num?)?.toDouble() ?? 0.0,
-      maalUang: (futures[5].first['total'] as num?)?.toDouble() ?? 0.0,
-      fidyahUang: (futures[6].first['total'] as num?)?.toDouble() ?? 0.0,
-      countFitrah: futures[7].first['c'] as int? ?? 0,
-      countProfesi: futures[8].first['c'] as int? ?? 0,
-      countMaal: futures[9].first['c'] as int? ?? 0,
-      countFidyah: futures[10].first['c'] as int? ?? 0,
-      todayMuzakki: futures[11].first['c'] as int? ?? 0,
-      todayUang: (futures[12].first['total'] as num?)?.toDouble() ?? 0.0,
-      recentTransactions: futures[13] as List<Map<String, dynamic>>,
+      totalUang: (agg['totalUang'] as num?)?.toDouble() ?? 0.0,
+      totalBeras: (agg['totalBeras'] as num?)?.toDouble() ?? 0.0,
+      fitrahUang: (agg['fitrahUang'] as num?)?.toDouble() ?? 0.0,
+      fitrahBeras: (agg['fitrahBeras'] as num?)?.toDouble() ?? 0.0,
+      profesiUang: (agg['profesiUang'] as num?)?.toDouble() ?? 0.0,
+      maalUang: (agg['maalUang'] as num?)?.toDouble() ?? 0.0,
+      fidyahUang: (agg['fidyahUang'] as num?)?.toDouble() ?? 0.0,
+      countFitrah: agg['countFitrah'] as int? ?? 0,
+      countProfesi: agg['countProfesi'] as int? ?? 0,
+      countMaal: agg['countMaal'] as int? ?? 0,
+      countFidyah: agg['countFidyah'] as int? ?? 0,
+      todayMuzakki: agg['todayMuzakki'] as int? ?? 0,
+      todayUang: (agg['todayUang'] as num?)?.toDouble() ?? 0.0,
+      recentTransactions: recentTransactions,
     );
   }
 
@@ -318,14 +532,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final Size screenSize = MediaQuery.of(context).size;
     final topPadding = MediaQuery.of(context).padding.top;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
+
+    final double navBarHeight = 65.0;
+    final double navBarBottomSpacing = 24.0 + bottomPadding;
+    final double fabSize = 58.0;
+
+    final double fabBottomPos =
+        navBarBottomSpacing + (navBarHeight / 2) - (fabSize / 2) + 12.0;
+    final double fabLeftPos = (screenSize.width / 2) - (fabSize / 2);
 
     return AppWatermarkBackground(
       child: Scaffold(
         extendBody: true,
         backgroundColor: Colors.transparent,
-
         body: FutureBuilder<_DashboardData>(
           future: _dashboardFuture,
           builder: (context, snapshot) {
@@ -370,6 +592,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           children: [
                             _HeroDashboardCard(
+                                  key: _heroKey,
                                   username: _currentUsername,
                                   totalUang: data.totalUang,
                                   totalBeras: data.totalBeras,
@@ -393,12 +616,15 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                             const SizedBox(height: 12),
+                            // FIX: Menghapus custom toolsKey yang memicu error, diganti dengan key bawaan super class
                             _ActionGrid(
+                              key: _toolsKey,
                               todayMuzakki: data.todayMuzakki,
                               todayUang: data.todayUang,
                             ),
                             const SizedBox(height: 24),
                             _DistributionMiniChart(
+                              key: _chartKey,
                               fitrah: data.countFitrah,
                               profesi: data.countProfesi,
                               maal: data.countMaal,
@@ -442,6 +668,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                 await AuthService.instance.deleteAccount(),
                             onUpdateProfile: (newName) {
                               setState(() => _currentUsername = newName);
+                            },
+                            onShowTutorial: () {
+                              setState(() => _selectedTab = 0);
+                              Future.delayed(
+                                const Duration(milliseconds: 300),
+                                () {
+                                  _showTutorial();
+                                },
+                              );
                             },
                           ),
                         ],
@@ -525,11 +760,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
 
                 Positioned(
-                  bottom: 24 + bottomPadding,
+                  bottom: navBarBottomSpacing,
                   left: 20,
                   right: 20,
-                  height: 65,
+                  height: navBarHeight,
                   child: Container(
+                    key: _navKey,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(32),
                       boxShadow: [
@@ -597,13 +833,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
 
                 Positioned(
-                  bottom: 24 + bottomPadding + 32,
-                  left: 0,
-                  right: 0,
+                  bottom: fabBottomPos,
+                  left: fabLeftPos,
                   child: Center(
                     child: Container(
-                      height: 58,
-                      width: 58,
+                      key: _fabKey,
+                      height: fabSize,
+                      width: fabSize,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         boxShadow: [
@@ -681,11 +917,13 @@ class _CustomLiquidNotchPainter extends CustomPainter {
   final double radius;
   final Color color;
   final double notchRadius;
+
   _CustomLiquidNotchPainter({
     required this.radius,
     required this.color,
     required this.notchRadius,
   });
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
@@ -695,22 +933,27 @@ class _CustomLiquidNotchPainter extends CustomPainter {
     final double w = size.width;
     final double h = size.height;
 
+    final double center = w / 2;
+    final double notchDepth = h * 0.72;
+    final double curveSpread = notchRadius + (w * 0.02);
+    final double bezierTension = w * 0.015;
+
     path.moveTo(radius, 0);
-    path.lineTo(w / 2 - notchRadius - 10, 0);
+    path.lineTo(center - curveSpread, 0);
     path.cubicTo(
-      w / 2 - notchRadius,
+      center - notchRadius,
       0,
-      w / 2 - notchRadius + 6,
-      h * 0.72,
-      w / 2,
-      h * 0.72,
+      center - notchRadius + bezierTension,
+      notchDepth,
+      center,
+      notchDepth,
     );
     path.cubicTo(
-      w / 2 + notchRadius - 6,
-      h * 0.72,
-      w / 2 + notchRadius,
+      center + notchRadius - bezierTension,
+      notchDepth,
+      center + notchRadius,
       0,
-      w / 2 + notchRadius + 10,
+      center + curveSpread,
       0,
     );
 
@@ -743,8 +986,6 @@ class _CustomLiquidNotchPainter extends CustomPainter {
   }
 
   @override
-  bool shouldReclip(covariant CustomPainter oldClipper) => false;
-  @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
@@ -760,6 +1001,7 @@ class _HeroDashboardCard extends StatefulWidget {
   final int todayCount;
 
   const _HeroDashboardCard({
+    super.key,
     required this.username,
     required this.totalUang,
     required this.totalBeras,
@@ -1016,7 +1258,12 @@ class _HeroDashboardCardState extends State<_HeroDashboardCard> {
 class _ActionGrid extends StatelessWidget {
   final int todayMuzakki;
   final double todayUang;
-  const _ActionGrid({required this.todayMuzakki, required this.todayUang});
+
+  const _ActionGrid({
+    super.key,
+    required this.todayMuzakki,
+    required this.todayUang,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1143,6 +1390,7 @@ class _DistributionMiniChart extends StatelessWidget {
   final int maal;
   final int fidyah;
   const _DistributionMiniChart({
+    super.key,
     required this.fitrah,
     required this.profesi,
     required this.maal,
@@ -1402,6 +1650,8 @@ class _ProfileTabContent extends StatefulWidget {
   final Future<void> Function() onLogout;
   final Future<void> Function() onDeleteAccount;
   final Function(String) onUpdateProfile;
+  final VoidCallback onShowTutorial;
+
   const _ProfileTabContent({
     required this.username,
     required this.email,
@@ -1409,6 +1659,7 @@ class _ProfileTabContent extends StatefulWidget {
     required this.onLogout,
     required this.onDeleteAccount,
     required this.onUpdateProfile,
+    required this.onShowTutorial,
   });
   @override
   State<_ProfileTabContent> createState() => _ProfileTabContentState();
@@ -1663,6 +1914,14 @@ class _ProfileTabContentState extends State<_ProfileTabContent> {
               ),
               const Divider(height: 1, color: Colors.black12),
               _buildMenuTile(
+                Icons.help_outline_rounded,
+                Colors.orange.shade700,
+                'Panduan Aplikasi',
+                'Lihat ulang tutorial cara penggunaan',
+                widget.onShowTutorial,
+              ),
+              const Divider(height: 1, color: Colors.black12),
+              _buildMenuTile(
                 Icons.support_agent_rounded,
                 Colors.indigo,
                 'Hotline Dewan Syariah',
@@ -1699,7 +1958,9 @@ class _ProfileTabContentState extends State<_ProfileTabContent> {
                   try {
                     await widget.onLogout();
                   } finally {
-                    if (mounted) setState(() => _working = false);
+                    if (mounted) {
+                      setState(() => _working = false);
+                    }
                   }
                 },
         ),
