@@ -75,25 +75,25 @@ _Fokus: Menyatukan keindahan visual premium (Fase 3) dengan kecerdasan algoritma
 
 _Fokus: Memenuhi kebutuhan administratif penyerahan laporan pertanggungjawaban fisik bagi DKM Masjid maupun BAZNAS daerah._
 
-- [ ] **Dependencies Tambahan Dokumen:** Memasang package `pdf` dan `printing` ke dalam proyek.
-- [ ] **Native PDF Layout Design:** Merancang struktur tata letak dokumen cetak secara estetis (menyertakan logo resmi Amil Track, header nama masjid, garis pembatas formal, dan tabel data transaksi tabular yang rapi).
-- [ ] **Fitur Filter & Kategori Cetak:** Membangun antarmuka penyaringan data berdasarkan rentang tanggal kalender atau klasifikasi rumpun kategori zakat sebelum berkas PDF diekspor.
-- [ ] **Share & Print Integration:** Menyediakan modul _preview_ instan, fitur cetak langsung via jaringan (Printer Bluetooth/WiFi), serta tombol bagikan (_share_) dokumen ke platform lain.
+- [x] **Dependencies Tambahan Dokumen:** Memasang package `pdf` dan `printing` ke dalam proyek.
+- [x] **Native PDF Layout Design:** Merancang struktur tata letak dokumen cetak secara estetis (menyertakan logo resmi Amil Track, header nama masjid, garis pembatas formal, dan tabel data transaksi tabular yang rapi).
+- [x] **Fitur Filter & Kategori Cetak:** Membangun antarmuka penyaringan data berdasarkan rentang tanggal kalender atau klasifikasi rumpun kategori zakat sebelum berkas PDF diekspor.
+- [x] **Share & Print Integration:** Menyediakan modul _preview_ instan, fitur cetak langsung via jaringan (Printer Bluetooth/WiFi), serta tombol bagikan (_share_) dokumen ke platform lain.
 
 ## ⏳ FASE 8: Automasi Struk Kwitansi WhatsApp
 
 _Fokus: Menghadirkan pengalaman pelayanan yang instan dan profesional bagi pembayar zakat melalui bukti terima digital._
 
-- [ ] **Rich Text Template Builder:** Menyusun fungsi _string generator_ yang merangkai pesan kwitansi secara elegan dan rapi menggunakan penataan spasi, format mata uang Rupiah, penanggalan yang sahih, serta penggunaan emoji yang ramah.
-- [ ] **Deep Linking Launcher:** Mengintegrasikan skema pengiriman URL aman `wa.me/628xxx?text=...` memanfaatkan package `url_launcher` agar langsung membuka aplikasi WhatsApp tujuan dengan pesan struk yang otomatis terisi rapi tinggal tekan kirim.
-- [ ] **Robust Error Handling:** Menyediakan mekanisme deteksi kegagalan sistem, seperti memunculkan pesan peringatan kustom (_SnackBar/Modal_) jika format nomor HP muzakki tidak valid atau aplikasi WhatsApp tidak terpasang di ponsel amil.
+- [x] **Rich Text Template Builder:** Menyusun fungsi _string generator_ yang merangkai pesan kwitansi secara elegan dan rapi menggunakan penataan spasi, format mata uang Rupiah, penanggalan yang sahih, serta penggunaan emoji yang ramah.
+- [x] **Deep Linking Launcher:** Mengintegrasikan skema pengiriman URL aman `wa.me/628xxx?text=...` memanfaatkan package `url_launcher` agar langsung membuka aplikasi WhatsApp tujuan dengan pesan struk yang otomatis terisi rapi tinggal tekan kirim.
+- [x] **Robust Error Handling:** Menyediakan mekanisme deteksi kegagalan sistem, seperti memunculkan pesan peringatan kustom (_SnackBar/Modal_) jika format nomor HP muzakki tidak valid atau aplikasi WhatsApp tidak terpasang di ponsel amil.
 
 ## ⏳ FASE 9: Final Polish & Persiapan Rilis Publik
 
 _Fokus: Standardisasi dan optimalisasi performa menyeluruh agar aplikasi lulus sensor saat diunggah ulang ke Google Play Store._
 
-- [ ] **App Icon & Branding Native:** Mengonfigurasi package `flutter_launcher_icons` untuk memasang aset logo resmi Amil Track secara otomatis di seluruh level sistem operasi (Android & iOS).
-- [ ] **Native Splash Screen Engine:** Mengonfigurasi package `flutter_native_splash` untuk membuang tampilan layar putih hampa saat aplikasi pertama kali dimuat di ponsel pengguna.
+- [x] **App Icon & Branding Native:** Mengonfigurasi package `flutter_launcher_icons` untuk memasang aset logo resmi Amil Track secara otomatis di seluruh level sistem operasi (Android & iOS).
+- [x] **Native Splash Screen Engine:** Mengonfigurasi package `flutter_native_splash` untuk membuang tampilan layar putih hampa saat aplikasi pertama kali dimuat di ponsel pengguna.
 - [ ] **Code Analysis & Linting Audit:** Menjalankan perintah analisis ketat `flutter analyze` untuk membersihkan seluruh sisa kode _warning_, _unused imports_, ataupun _deprecated code_.
 - [ ] **Production Optimization:** Mematikan _debug banner_ pojok kanan atas, menguji kestabilan memori dari kebocoran (_memory leak_), serta melakukan kompilasi rilis akhir menggunakan target _bundle_ yang optimal.
 

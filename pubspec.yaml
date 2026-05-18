@@ -47,6 +47,10 @@ dependencies:
   sqflite: ^2.3.2
   path_provider: ^2.1.2
   connectivity_plus: ^6.0.3
+  # FIX: Menambahkan mesin pembuat PDF
+  pdf: ^3.12.0
+  printing: ^5.14.3
+  path: ^1.9.1
 
 dev_dependencies:
   flutter_test:
@@ -58,6 +62,10 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  # KONFIGURASI 1: Pasang package pembentuk ikon di dev_dependencies
+  flutter_launcher_icons: ^0.13.1
+  # KONFIGURASI 2: Pasang package pembentuk splash screen di dev_dependencies
+  flutter_native_splash: ^2.4.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -76,7 +84,23 @@ flutter:
   # assets:
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg
+# CETAK BIRU FASE 9 (LANGKAH 1): GENERATOR IKON NATIVE
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/logo_amil_track.png"
+  min_sdk_android: 21
+  remove_alpha_ios: true
 
+# CETAK BIRU FASE 9 (LANGKAH 2): GENERATOR SPLASH SCREEN
+flutter_native_splash:
+  color: "#064E3B" # Warna dasar Emerald Deep
+  image: "assets/images/logo_amil_track_transparant.png" # Menggunakan logo transparan
+  android: true
+  ios: true
+  android_12:
+    image: "assets/images/logo_amil_track_transparant.png"
+    icon_background_color: "#064E3B"
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 
