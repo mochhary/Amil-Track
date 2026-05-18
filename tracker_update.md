@@ -113,8 +113,8 @@ _Fokus: Mengatasi potensi kerapuhan sistem (vulnerabilities) dan meningkatkan ef
 _Fokus: Mengganti `setState` dengan Riverpod secara perlahan tanpa mengubah logika otentikasi (AuthService) maupun kredensial yang sudah terbukti berjalan lancar._
 
 - [x] **11.1 Instalasi & Setup ProviderScope:** Memasang *package* `flutter_riverpod` dan membungkus `MyApp` di `main.dart` tanpa menyentuh inisialisasi Supabase yang sudah ada di `core/constants.dart`.
-- [ ] **11.2 Global Auth Provider:** Membuat `auth_provider.dart` murni untuk memantau status sesi pengguna saat ini, tanpa mengubah fungsi `signInWithOAuth` di `AuthService`.
-- [ ] **11.3 Migrasi AuthGate:** Mengubah `AuthGate` di `main.dart` dari `StatefulWidget`/konvensional menjadi `ConsumerWidget` yang reaktif mendengarkan `auth_provider.dart`.
+- [x] **11.2 Global Auth Provider:** Membuat `auth_provider.dart` murni untuk memantau status sesi pengguna saat ini, tanpa mengubah fungsi `signInWithOAuth` di `AuthService`.
+- [x] **11.3 Migrasi AuthGate:** Mengubah `AuthGate` di `main.dart` dari `StatefulWidget`/konvensional menjadi `ConsumerWidget` yang reaktif mendengarkan `auth_provider.dart`.
 
 ## ⏳ FASE 12: Pemotongan UI (Slicing) & Riverpod Lanjutan
 

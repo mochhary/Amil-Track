@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart'; // TAMBAHAN: Import Riverpod
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/constants.dart';
 import 'core/theme.dart';
@@ -10,7 +10,9 @@ import 'screens/home_screen.dart';
 import 'core/navigation.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/profile_setup_screen.dart';
-import 'services/supabase_service.dart';
+
+// TAMBAHAN: Import provider yang baru kita buat di langkah 11.2
+import 'providers/auth_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,7 +22,6 @@ Future<void> main() async {
     anonKey: AppConstants.supabaseAnonKey,
   );
 
-  // TAMBAHAN: Bungkus aplikasi dengan ProviderScope agar state management menyala
   runApp(const ProviderScope(child: AmilTrackApp()));
 }
 
@@ -35,9 +36,11 @@ class AmilTrackApp extends StatelessWidget {
       title: AppConstants.appName,
       theme: AppTheme.lightTheme,
       initialRoute: '/',
-      routes: {'/': (context) => const _AuthGate()},
+      routes: {
+        '/': (context) => const AuthGate(),
+      }, // _AuthGate diubah jadi AuthGate
       onUnknownRoute: (settings) {
-        return MaterialPageRoute(builder: (_) => const _AuthGate());
+        return MaterialPageRoute(builder: (_) => const AuthGate());
       },
       builder: (context, child) {
         return AppWatermarkBackground(child: child ?? const SizedBox.shrink());
@@ -46,51 +49,52 @@ class AmilTrackApp extends StatelessWidget {
   }
 }
 
-class _AuthGate extends StatefulWidget {
-  const _AuthGate();
+// 1. Ubah menjadi ConsumerWidget agar bisa menggunakan Riverpod
+class AuthGate extends ConsumerWidget {
+  const AuthGate({super.key});
 
+  // 2. Tambahkan WidgetRef ref di dalam method build
   @override
-  State<_AuthGate> createState() => _AuthGateState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    // 3. Pantau status sesi (login/logout) secara reaktif
+    final authStateAsync = ref.watch(authStateProvider);
 
-class _AuthGateState extends State<_AuthGate> {
-  Future<String?>? _usernameFuture;
+    return authStateAsync.when(
+      loading: () => const Scaffold(body: GlassLoadingSplash()),
+      error: (error, stack) =>
+          Scaffold(body: Center(child: Text('Error Auth: $error'))),
+      data: (authState) {
+        final session = authState.session;
 
-  void _refreshProfileState() {
-    setState(() {
-      _usernameFuture = SupabaseService.instance.getCurrentUsername();
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // AuthGate masih menggunakan logika bawaan yang terbukti stabil
-    return StreamBuilder<AuthState>(
-      stream: Supabase.instance.client.auth.onAuthStateChange,
-      builder: (context, snapshot) {
-        final session =
-            snapshot.data?.session ??
-            Supabase.instance.client.auth.currentSession;
-
-        if (session != null) {
-          _usernameFuture ??= SupabaseService.instance.getCurrentUsername();
-          return FutureBuilder<String?>(
-            future: _usernameFuture,
-            builder: (context, profileSnapshot) {
-              if (profileSnapshot.connectionState == ConnectionState.waiting) {
-                return const Scaffold(body: GlassLoadingSplash());
-              }
-
-              final username = profileSnapshot.data;
-              if (username == null || username.trim().isEmpty) {
-                return ProfileSetupScreen(onCompleted: _refreshProfileState);
-              }
-
-              return HomeScreen(username: username);
-            },
-          );
+        // Jika belum login, arahkan ke layar Onboarding
+        if (session == null) {
+          return const OnboardingScreen();
         }
-        return const OnboardingScreen();
+
+        // 4. Jika sudah login, pantau status profil (username)
+        final profileAsync = ref.watch(userProfileProvider);
+
+        return profileAsync.when(
+          loading: () => const Scaffold(body: GlassLoadingSplash()),
+          error: (error, stack) =>
+              Scaffold(body: Center(child: Text('Error Profil: $error'))),
+          data: (username) {
+            // Jika belum ada username, paksa ke layar setup profil
+            if (username == null || username.trim().isEmpty) {
+              return ProfileSetupScreen(
+                onCompleted: () {
+                  // KEAJAIBAN RIVERPOD:
+                  // Saat profil di-save, cukup panggil baris ini dan Riverpod
+                  // akan otomatis memuat ulang username dari database dan melempar ke Home!
+                  ref.invalidate(userProfileProvider);
+                },
+              );
+            }
+
+            // Jika semua aman, masuk ke Beranda!
+            return HomeScreen(username: username);
+          },
+        );
       },
     );
   }
