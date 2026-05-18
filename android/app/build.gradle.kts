@@ -55,7 +55,8 @@ android {
             signingConfig = if (isSigningConfigValid) {
                 signingConfigs.getByName("release")
             } else {
-                signingConfigs.getByName("debug")
+                // FIX: Paksa mesin untuk ERROR jika key.properties tidak sah, jangan diam-diam pakai debug!
+                throw GradleException("ERROR FATAL: File key.properties tidak ditemukan atau spasinya berantakan! Aplikasi gagal dikunci untuk Rilis.")
             }
         }
     }
