@@ -106,3 +106,34 @@ _Fokus: Mengatasi potensi kerapuhan sistem (vulnerabilities) dan meningkatkan ef
 - [x] **Pemantauan Jaringan Efisien (Network Checking):** Mengganti metode `Timer.periodic` dan `InternetAddress.lookup` yang terus-menerus berjalan dan memakan daya baterai dengan *package* `connectivity_plus`. Pendekatan _event-driven_ ini akan memantau perubahan status koneksi perangkat secara pasif tanpa harus membebani _thread_ aplikasi.
 - [x] **Walkthrough ilang:** 
 - [x] **Initial Cloud Pull (Two-Way Sync):** Membangun fungsi penyedot data awal yang otomatis mengunduh riwayat transaksi dari Supabase ke dalam SQLite lokal saat amil baru pertama kali login di perangkat baru.
+---
+
+## ⏳ FASE 11: Arsitektur Reaktif Dasar (Riverpod Integrasi Aman)
+
+_Fokus: Mengganti `setState` dengan Riverpod secara perlahan tanpa mengubah logika otentikasi (AuthService) maupun kredensial yang sudah terbukti berjalan lancar._
+
+- [x] **11.1 Instalasi & Setup ProviderScope:** Memasang *package* `flutter_riverpod` dan membungkus `MyApp` di `main.dart` tanpa menyentuh inisialisasi Supabase yang sudah ada di `core/constants.dart`.
+- [ ] **11.2 Global Auth Provider:** Membuat `auth_provider.dart` murni untuk memantau status sesi pengguna saat ini, tanpa mengubah fungsi `signInWithOAuth` di `AuthService`.
+- [ ] **11.3 Migrasi AuthGate:** Mengubah `AuthGate` di `main.dart` dari `StatefulWidget`/konvensional menjadi `ConsumerWidget` yang reaktif mendengarkan `auth_provider.dart`.
+
+## ⏳ FASE 12: Pemotongan UI (Slicing) & Riverpod Lanjutan
+
+_Fokus: Membedah file UI yang terlalu bengkak (seperti `home_screen.dart`) menjadi komponen kecil yang menggunakan Riverpod untuk mengambil datanya masing-masing._
+
+- [ ] **12.1 Ekstraksi Logika Dashboard:** Membuat `dashboard_provider.dart` untuk memindahkan fungsi-fungsi berat (seperti mengambil total uang/beras dari SQLite) keluar dari UI.
+- [ ] **12.2 Slicing Home Screen (Bagian Atas):** Memecah bagian *header* dan *hero card* (Kalkulator Zakat) menjadi *widget* terpisah di dalam folder `widgets/`.
+- [ ] **12.3 Slicing Home Screen (Bagian Bawah):** Memecah *Grid Menu* dan *Recent Activity* menjadi komponen mandiri agar `home_screen.dart` menjadi sangat ringkas dan mudah dibaca.
+
+## ⏳ FASE 13: Isolasi Data Pengguna (Multi-Tenancy Skala Enterprise)
+
+_Fokus: Memastikan privasi dan keamanan data; Amil A tidak boleh bisa melihat, mengedit, atau menyinkronkan data transaksi milik Amil B._
+
+- [ ] **13.1 Modifikasi Skema SQLite Lokal:** Melakukan migrasi database di `sqlite_service.dart` untuk menambahkan kolom krusial `user_id` pada setiap baris transaksi yang dicatat.
+- [ ] **13.2 Filter Query & Restrukturisasi Auto-Sync:** Mengubah logika agregasi *dashboard* dan otak sinkronisasi (`sync_service.dart`) agar selalu mengunci data pada `WHERE user_id = current_user_id`.
+
+## ⏳ FASE 14: Keamanan Tingkat Lanjut & Native Login (Fase Ekspansi)
+
+_Fokus: Menerapkan keamanan tingkat rilis (Production) HANYA SETELAH seluruh UI dan State Management berjalan sempurna 100%._
+
+- [ ] **14.1 Isolasi API Key (.env):** Memasang package `flutter_dotenv` untuk menyembunyikan URL Supabase dan memindahkannya dari `constants.dart` dengan aman.
+- [ ] **14.2 Migrasi ke Native Google Sign-In:** Mengganti metode *browser* Supabase menjadi *pop-up* asli bawaan Android menggunakan Web Client ID (Dilakukan perlahan sambil memantau log *error* native).

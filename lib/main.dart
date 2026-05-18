@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart'; // TAMBAHAN: Import Riverpod
 
 import 'core/constants.dart';
 import 'core/theme.dart';
@@ -19,7 +20,8 @@ Future<void> main() async {
     anonKey: AppConstants.supabaseAnonKey,
   );
 
-  runApp(const AmilTrackApp());
+  // TAMBAHAN: Bungkus aplikasi dengan ProviderScope agar state management menyala
+  runApp(const ProviderScope(child: AmilTrackApp()));
 }
 
 class AmilTrackApp extends StatelessWidget {
@@ -62,6 +64,7 @@ class _AuthGateState extends State<_AuthGate> {
 
   @override
   Widget build(BuildContext context) {
+    // AuthGate masih menggunakan logika bawaan yang terbukti stabil
     return StreamBuilder<AuthState>(
       stream: Supabase.instance.client.auth.onAuthStateChange,
       builder: (context, snapshot) {
