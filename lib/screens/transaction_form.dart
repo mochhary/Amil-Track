@@ -1,49 +1,63 @@
-// ignore_for_file: deprecated_member_use
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/constants.dart';
-import '../services/sqlite_service.dart';
-import '../utils/currency_input_formatter.dart';
-import '../widgets/zakat_preview_card.dart';
+import '../providers/zakat_calculator_provider.dart';
+import '../widgets/live_preview_card.dart';
 
-class TransactionFormScreen extends StatefulWidget {
-  const TransactionFormScreen({super.key});
-
+class CurrencyInputFormatter extends TextInputFormatter {
   @override
-  State<TransactionFormScreen> createState() => _TransactionFormScreenState();
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty) return newValue;
+    String digitsOnly = newValue.text.replaceAll(RegExp(r'[^\d]'), '');
+    if (digitsOnly.isEmpty) return const TextEditingValue(text: '');
+    final number = int.parse(digitsOnly);
+    final newString = NumberFormat.decimalPattern('id').format(number);
+    return TextEditingValue(
+      text: newString,
+      selection: TextSelection.collapsed(offset: newString.length),
+    );
+  }
 }
 
-class _TransactionFormScreenState extends State<TransactionFormScreen> {
+class TransactionFormScreen extends ConsumerStatefulWidget {
+  const TransactionFormScreen({super.key});
+  @override
+  ConsumerState<TransactionFormScreen> createState() =>
+      _TransactionFormScreenState();
+}
+
+class _TransactionFormScreenState extends ConsumerState<TransactionFormScreen> {
   final _formKey = GlobalKey<FormState>();
-
   final _namaController = TextEditingController();
-  final _phoneController = TextEditingController();
-
   final _jiwaController = TextEditingController(text: '1');
   final _gajiController = TextEditingController();
   final _bonusController = TextEditingController();
   final _hartaController = TextEditingController();
   final _hariController = TextEditingController();
 
-  String _selectedKategori = 'Fitrah';
-  String _tipeSatuanFitrah = 'uang';
-  double _calculatedJumlah = 0.0;
-  bool _isSaving = false;
-
-  final double _hargaBerasPerKg = 16000.0;
-  final double _tarifFidyahPerHari = 60000.0;
-  final double _nisabProfesiBulanan = 6859394.0;
-
   @override
   void initState() {
     super.initState();
-    _calculateZakatLive();
+    // Tambahkan listener agar setiap ketikan otomatis menghitung zakat
+    _jiwaController.addListener(_triggerCalculate);
+    _gajiController.addListener(_triggerCalculate);
+    _bonusController.addListener(_triggerCalculate);
+    _hartaController.addListener(_triggerCalculate);
+    _hariController.addListener(_triggerCalculate);
+
+    // Hitung awal (default 1 Jiwa Fitrah)
+    WidgetsBinding.instance.addPostFrameCallback((_) => _triggerCalculate());
   }
 
   @override
   void dispose() {
     _namaController.dispose();
-    _phoneController.dispose();
     _jiwaController.dispose();
     _gajiController.dispose();
     _bonusController.dispose();
@@ -52,249 +66,136 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
     super.dispose();
   }
 
-  void _calculateZakatLive() {
-    setState(() {
-      if (_selectedKategori == 'Fitrah') {
-        final String rawJiwa = _jiwaController.text.replaceAll('.', '');
-        final int jiwa = int.tryParse(rawJiwa) ?? 0;
-        if (_tipeSatuanFitrah == 'beras') {
-          _calculatedJumlah = jiwa * 2.5;
-        } else {
-          _calculatedJumlah = jiwa * 2.5 * _hargaBerasPerKg;
-        }
-      } else if (_selectedKategori == 'Profesi') {
-        final String rawGaji = _gajiController.text.replaceAll('.', '');
-        final String rawBonus = _bonusController.text.replaceAll('.', '');
-        final double gaji = double.tryParse(rawGaji) ?? 0.0;
-        final double bonus = double.tryParse(rawBonus) ?? 0.0;
-        final double totalPendapatan = gaji + bonus;
+  // --- FUNGSI TRIGGER KE PROVIDER ---
+  void _triggerCalculate() {
+    final notifier = ref.read(zakatCalculatorProvider.notifier);
+    final kat = ref.read(zakatCalculatorProvider).kategori;
 
-        if (totalPendapatan >= _nisabProfesiBulanan) {
-          _calculatedJumlah = totalPendapatan * 0.025;
-        } else {
-          _calculatedJumlah = 0.0;
-        }
-      } else if (_selectedKategori == 'Maal') {
-        final String rawHarta = _hartaController.text.replaceAll('.', '');
-        final double harta = double.tryParse(rawHarta) ?? 0.0;
-        if (harta >= 82312725.0) {
-          _calculatedJumlah = harta * 0.025;
-        } else {
-          _calculatedJumlah = 0.0;
-        }
-      } else if (_selectedKategori == 'Fidyah') {
-        final String rawHari = _hariController.text.replaceAll('.', '');
-        final int hari = int.tryParse(rawHari) ?? 0;
-        _calculatedJumlah = hari * _tarifFidyahPerHari;
-      }
-    });
+    if (kat == 'Fitrah') {
+      final int jiwa =
+          int.tryParse(_jiwaController.text.replaceAll('.', '')) ?? 0;
+      notifier.calculateFitrah(jiwa);
+    } else if (kat == 'Profesi') {
+      final double total =
+          (double.tryParse(_gajiController.text.replaceAll('.', '')) ?? 0.0) +
+          (double.tryParse(_bonusController.text.replaceAll('.', '')) ?? 0.0);
+      notifier.calculateProfesi(total);
+    } else if (kat == 'Maal') {
+      final double harta =
+          double.tryParse(_hartaController.text.replaceAll('.', '')) ?? 0.0;
+      notifier.calculateMaal(harta);
+    } else if (kat == 'Fidyah') {
+      final int hari =
+          int.tryParse(_hariController.text.replaceAll('.', '')) ?? 0;
+      notifier.calculateFidyah(hari);
+    }
   }
 
   Future<void> _submitForm() async {
-    if (!_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Tolong lengkapi inputan wajib!'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
-    if (_calculatedJumlah <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _selectedKategori == 'Profesi' || _selectedKategori == 'Maal'
-                ? 'Pendapatan/aset belum mencapai batas nisab wajib zakat.'
-                : 'Jumlah nominal transaksi tidak valid.',
-          ),
-          backgroundColor: Colors.orange.shade800,
-        ),
-      );
-      return;
-    }
+    final state = ref.read(zakatCalculatorProvider);
+    if (state.calculatedJumlah <= 0) return;
 
-    setState(() => _isSaving = true);
-
-    try {
-      final db = await SqliteService.instance.database;
-
-      int? jumlahJiwaData;
-      if (_selectedKategori == 'Fitrah') {
-        final String rawJiwa = _jiwaController.text.replaceAll('.', '');
-        jumlahJiwaData = int.tryParse(rawJiwa) ?? 1;
-      }
-
-      final Map<String, dynamic> txRow = {
-        SqliteService.columnNamaMuzakki: _namaController.text.trim(),
-        SqliteService.columnKategoriZakat: _selectedKategori,
-        SqliteService.columnJumlah: _calculatedJumlah,
-        SqliteService.columnTipeSatuan: _selectedKategori == 'Fitrah'
-            ? _tipeSatuanFitrah
-            : 'uang',
-        SqliteService.columnJumlahJiwa: jumlahJiwaData,
-        SqliteService.columnCreatedAt: DateTime.now().toIso8601String(),
-        SqliteService.columnSyncStatus: 0,
-      };
-
-      await db.insert(SqliteService.tableTransactions, txRow);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Transaksi Berhasil Dicatat & Disinkronisasi!'),
-            backgroundColor: AppColors.emeraldDeep,
-          ),
+    final success = await ref
+        .read(zakatCalculatorProvider.notifier)
+        .saveTransaction(
+          namaMuzakki: _namaController.text.trim(),
+          jumlahJiwa: state.kategori == 'Fitrah'
+              ? int.tryParse(_jiwaController.text.replaceAll('.', ''))
+              : null,
         );
-        Navigator.pop(context, true);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Gagal menyimpan transaksi: $e'),
-            backgroundColor: Colors.red.shade800,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isSaving = false);
-      }
+
+    if (success && mounted) {
+      Navigator.pop(context, true); // Kembali ke Beranda & trigger refresh
     }
   }
 
+  // --- UI RENDERER ---
   @override
   Widget build(BuildContext context) {
+    // Pantau state kalkulator secara reaktif
+    final zakatState = ref.watch(zakatCalculatorProvider);
+    final notifier = ref.read(zakatCalculatorProvider.notifier);
+
     return Scaffold(
       backgroundColor: AppColors.softSurface,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
         title: const Text(
           'Input Setoran Zakat',
-          style: TextStyle(
-            fontWeight: FontWeight.w900,
-            color: AppColors.emeraldDeep,
-            fontSize: 18,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w900),
         ),
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: AppColors.emeraldDeep,
-            size: 20,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.white,
       ),
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+          padding: const EdgeInsets.all(20),
           children: [
+            // 1. INPUT IDENTITAS
             Container(
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 10,
-                  ),
-                ],
+                borderRadius: BorderRadius.circular(16),
               ),
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Identitas Pembayar (Muzakki)',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.emeraldDeep,
-                      fontSize: 14,
-                    ),
+              child: TextFormField(
+                controller: _namaController,
+                validator: (val) => val == null || val.isEmpty
+                    ? 'Nama Muzakki wajib diisi'
+                    : null,
+                decoration: InputDecoration(
+                  labelText: 'Nama Lengkap Muzakki *',
+                  prefixIcon: const Icon(
+                    Icons.person_rounded,
+                    color: AppColors.emeraldDeep,
                   ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _namaController,
-                    validator: (v) => v == null || v.trim().isEmpty
-                        ? 'Nama muzakki tidak boleh kosong'
-                        : null,
-                    decoration: InputDecoration(
-                      labelText: 'Nama Lengkap Muzakki *',
-                      prefixIcon: const Icon(Icons.person_outline_rounded),
-                      filled: true,
-                      fillColor: AppColors.softSurface.withValues(alpha: 0.5),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
                   ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _phoneController,
-                    keyboardType: TextInputType.phone,
-                    decoration: InputDecoration(
-                      labelText: 'Nomor WhatsApp (Opsional)',
-                      prefixIcon: const Icon(Icons.phone_iphone_rounded),
-                      filled: true,
-                      fillColor: AppColors.softSurface.withValues(alpha: 0.5),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                ],
+                  filled: true,
+                  fillColor: AppColors.softSurface,
+                ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
 
+            // 2. PILIHAN KATEGORI
             const Text(
-              'Pilih Kategori Zakat',
+              'Kategori Setoran',
               style: TextStyle(
-                fontWeight: FontWeight.w800,
-                color: AppColors.emeraldDeep,
-                fontSize: 14,
+                fontWeight: FontWeight.w900,
+                color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: ['Fitrah', 'Profesi', 'Maal', 'Fidyah'].map((kat) {
-                final bool isSelected = _selectedKategori == kat;
+                final isSelected = zakatState.kategori == kat;
                 return Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                    padding: const EdgeInsets.only(right: 6.0),
                     child: ChoiceChip(
                       label: Text(
                         kat,
                         style: TextStyle(
-                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
                           color: isSelected
                               ? Colors.white
-                              : AppColors.textPrimary,
+                              : AppColors.textSecondary,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                       selected: isSelected,
                       selectedColor: AppColors.emeraldDeep,
                       backgroundColor: Colors.white,
-                      showCheckmark: false,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      onSelected: (selected) {
-                        if (selected) {
-                          setState(() {
-                            _selectedKategori = kat;
-                            _calculatedJumlah = 0.0;
-                          });
-                          _calculateZakatLive();
+                      onSelected: (val) {
+                        if (val) {
+                          notifier.setKategori(kat);
+                          _triggerCalculate();
                         }
                       },
                     ),
@@ -302,203 +203,158 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                 );
               }).toList(),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
 
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 10,
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            // 3. DYNAMIC FIELDS (Berdasarkan Kategori)
+            if (zakatState.kategori == 'Fitrah') ...[
+              Row(
                 children: [
-                  Text(
-                    'Detail Perhitungan $_selectedKategori',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.emeraldDeep,
-                      fontSize: 14,
+                  Expanded(
+                    child: RadioListTile<String>(
+                      title: const Text(
+                        'Beras (Kg)',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      value: 'beras',
+                      groupValue: zakatState.tipeSatuanFitrah,
+                      activeColor: AppColors.emeraldDeep,
+                      contentPadding: EdgeInsets.zero,
+                      onChanged: (val) {
+                        notifier.setTipeSatuanFitrah(val!);
+                        _triggerCalculate();
+                      },
                     ),
                   ),
-                  const SizedBox(height: 16),
-
-                  if (_selectedKategori == 'Fitrah') ...[
-                    TextFormField(
-                      controller: _jiwaController,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [CurrencyInputFormatter()],
-                      validator: (v) => v == null || v.trim().isEmpty
-                          ? 'Jumlah jiwa wajib diisi'
-                          : null,
-                      onChanged: (v) => _calculateZakatLive(),
-                      decoration: InputDecoration(
-                        labelText: 'Jumlah Jiwa (Tanggungan) *',
-                        prefixIcon: const Icon(Icons.people_outline_rounded),
-                        filled: true,
-                        fillColor: AppColors.softSurface.withValues(alpha: 0.5),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
+                  Expanded(
+                    child: RadioListTile<String>(
+                      title: const Text(
+                        'Uang (Rp)',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
+                      value: 'uang',
+                      groupValue: zakatState.tipeSatuanFitrah,
+                      activeColor: AppColors.emeraldDeep,
+                      contentPadding: EdgeInsets.zero,
+                      onChanged: (val) {
+                        notifier.setTipeSatuanFitrah(val!);
+                        _triggerCalculate();
+                      },
                     ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Metode Pembayaran Fitrah',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textSecondary,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: RadioListTile<String>(
-                            title: const Text(
-                              'Uang tunai',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            value: 'uang',
-                            groupValue: _tipeSatuanFitrah,
-                            activeColor: AppColors.emeraldDeep,
-                            contentPadding: EdgeInsets.zero,
-                            onChanged: (v) {
-                              setState(() => _tipeSatuanFitrah = v!);
-                              _calculateZakatLive();
-                            },
-                          ),
-                        ),
-                        Expanded(
-                          child: RadioListTile<String>(
-                            title: const Text(
-                              'Beras murni',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            value: 'beras',
-                            groupValue: _tipeSatuanFitrah,
-                            activeColor: AppColors.emeraldDeep,
-                            contentPadding: EdgeInsets.zero,
-                            onChanged: (v) {
-                              setState(() => _tipeSatuanFitrah = v!);
-                              _calculateZakatLive();
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-
-                  if (_selectedKategori == 'Profesi') ...[
-                    TextFormField(
-                      controller: _gajiController,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [CurrencyInputFormatter()],
-                      validator: (v) => v == null || v.trim().isEmpty
-                          ? 'Gaji pokok wajib diisi'
-                          : null,
-                      onChanged: (v) => _calculateZakatLive(),
-                      decoration: InputDecoration(
-                        labelText: 'Gaji Pokok Bulanan (Rp) *',
-                        prefixIcon: const Icon(Icons.payments_outlined),
-                        filled: true,
-                        fillColor: AppColors.softSurface.withValues(alpha: 0.5),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _bonusController,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [CurrencyInputFormatter()],
-                      onChanged: (v) => _calculateZakatLive(),
-                      decoration: InputDecoration(
-                        labelText: 'Tunjangan / Bonus Lainnya (Rp)',
-                        prefixIcon: const Icon(Icons.add_card_rounded),
-                        filled: true,
-                        fillColor: AppColors.softSurface.withValues(alpha: 0.5),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                  ],
-
-                  if (_selectedKategori == 'Maal') ...[
-                    TextFormField(
-                      controller: _hartaController,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [CurrencyInputFormatter()],
-                      validator: (v) => v == null || v.trim().isEmpty
-                          ? 'Nilai harta wajib diisi'
-                          : null,
-                      onChanged: (v) => _calculateZakatLive(),
-                      decoration: InputDecoration(
-                        labelText: 'Total Nilai Harta Simpanan (Rp) *',
-                        prefixIcon: const Icon(Icons.account_balance_rounded),
-                        helperText:
-                            'Meliputi tabungan, emas mengendap selama 1 tahun haul.',
-                        filled: true,
-                        fillColor: AppColors.softSurface.withValues(alpha: 0.5),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                  ],
-
-                  if (_selectedKategori == 'Fidyah') ...[
-                    TextFormField(
-                      controller: _hariController,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [CurrencyInputFormatter()],
-                      validator: (v) => v == null || v.trim().isEmpty
-                          ? 'Jumlah hari wajib diisi'
-                          : null,
-                      onChanged: (v) => _calculateZakatLive(),
-                      decoration: InputDecoration(
-                        labelText: 'Jumlah Hari Utang Puasa *',
-                        prefixIcon: const Icon(Icons.calendar_today_rounded),
-                        filled: true,
-                        fillColor: AppColors.softSurface.withValues(alpha: 0.5),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ],
               ),
-            ),
-            const SizedBox(height: 20),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _jiwaController,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  CurrencyInputFormatter(),
+                ],
+                decoration: InputDecoration(
+                  labelText: 'Jumlah Jiwa',
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ] else if (zakatState.kategori == 'Profesi') ...[
+              TextFormField(
+                controller: _gajiController,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  CurrencyInputFormatter(),
+                ],
+                decoration: InputDecoration(
+                  labelText: 'Pendapatan Pokok / Bulan (Rp)',
+                  prefixText: 'Rp ',
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _bonusController,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  CurrencyInputFormatter(),
+                ],
+                decoration: InputDecoration(
+                  labelText: 'Bonus / THR (Opsional)',
+                  prefixText: 'Rp ',
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ] else if (zakatState.kategori == 'Maal') ...[
+              TextFormField(
+                controller: _hartaController,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  CurrencyInputFormatter(),
+                ],
+                decoration: InputDecoration(
+                  labelText: 'Total Harta Tersimpan (Emas/Uang/Aset)',
+                  prefixText: 'Rp ',
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ] else if (zakatState.kategori == 'Fidyah') ...[
+              TextFormField(
+                controller: _hariController,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  CurrencyInputFormatter(),
+                ],
+                decoration: InputDecoration(
+                  labelText: 'Jumlah Hari Ditinggalkan',
+                  suffixText: 'Hari',
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ],
 
-            ZakatPreviewCard(
-              selectedKategori: _selectedKategori,
-              tipeSatuanFitrah: _tipeSatuanFitrah,
-              calculatedJumlah: _calculatedJumlah,
-            ),
             const SizedBox(height: 32),
 
+            // 4. LIVE PREVIEW CARD REAKTIF
+            LivePreviewCard(
+              kategori: zakatState.kategori,
+              tipeSatuan: zakatState.tipeSatuanFitrah,
+              jumlah: zakatState.calculatedJumlah,
+            ),
+
+            const SizedBox(height: 32),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.emeraldDeep,
@@ -507,26 +363,26 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
-                elevation: 0,
               ),
-              onPressed: _isSaving ? null : _submitForm,
-              child: _isSaving
+              onPressed: zakatState.isSaving ? null : _submitForm,
+              child: zakatState.isSaving
                   ? const SizedBox(
-                      height: 24,
                       width: 24,
+                      height: 24,
                       child: CircularProgressIndicator(
                         color: Colors.white,
-                        strokeWidth: 2.5,
+                        strokeWidth: 3,
                       ),
                     )
                   : const Text(
-                      'Catat & Simpan Setoran',
+                      'Simpan Data Setoran',
                       style: TextStyle(
                         fontWeight: FontWeight.w900,
                         fontSize: 16,
                       ),
                     ),
             ),
+            const SizedBox(height: 40), // Jarak bawah layar
           ],
         ),
       ),

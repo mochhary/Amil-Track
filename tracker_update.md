@@ -129,7 +129,7 @@ _Fokus: Membedah file UI yang terlalu bengkak (seperti `home_screen.dart`) menja
 - [x] **12.7 Refactoring Enterprise (Part 1):** Membuat `dialog_utils.dart` dan merombak `dashboard_provider.dart` untuk *caching* Riverpod.
 - [x] **12.8 Integrasi Riverpod di Beranda:** Mengubah `HomeScreen` menjadi `ConsumerStatefulWidget` dan menggunakan `localDashboardProvider` untuk memuat data tanpa `setState`.
 - [x] **12.9 Implementasi Pusat Utilitas:** Memperbarui `action_grid.dart` dan `profile_tab_content.dart` agar menggunakan fungsi dari `DialogUtils` secara terpusat.
-- [ ] **12.10 Refactor List Provider:** Ekstraksi filter & pencarian ke `TransactionListProvider`.
+- [x] **12.10 Refactor List Provider:** Ekstraksi filter & pencarian ke `TransactionListProvider`.
 - [ ] **12.11 Refactor Form Provider:** Ekstraksi kalkulator zakat ke `ZakatCalculatorProvider`.
 - [ ] **12.12 Keamanan Database (Security):** Obfuscation & abstraction layer untuk schema SQL.
 - [ ] **12.13 Lingkungan Aman:** Implementasi `.env` & `flutter_dotenv` untuk menyembunyikan API/URL.
