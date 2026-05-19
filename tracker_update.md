@@ -122,7 +122,10 @@ _Fokus: Membedah file UI yang terlalu bengkak (seperti `home_screen.dart`) menja
 
 - [x] **12.1 Ekstraksi Logika Dashboard:** Membuat `dashboard_provider.dart` untuk memindahkan fungsi-fungsi berat (seperti mengambil total uang/beras dari SQLite) keluar dari UI.
 - [x] **12.2 Slicing Home Screen (Bagian Atas):** Memecah bagian *header* dan *hero card* (Kalkulator Zakat) menjadi *widget* terpisah di dalam folder `widgets/`.
-- [ ] **12.3 Slicing Home Screen (Bagian Bawah):** Memecah *Grid Menu* dan *Recent Activity* menjadi komponen mandiri agar `home_screen.dart` menjadi sangat ringkas dan mudah dibaca.
+- [x] **12.3 Slicing Home Screen (Bagian Bawah):** Memecah *Grid Menu* dan *Recent Activity* menjadi komponen mandiri agar `home_screen.dart` menjadi sangat ringkas dan mudah dibaca.
+- [ ] **12.4 Slicing Tab Profil (Finalisasi Home):** Memisahkan `_ProfileTabContent` dan `_EditProfileModal` menjadi file `profile_tab_content.dart` agar `home_screen.dart` murni hanya berisi kerangka navigasi utama.
+- [ ] **12.5 Slicing Transaction List:** Memecah `transaction_list.dart` dengan mengekstraksi kartu *item* transaksi dan *modal* opsi dokumen PDF/WhatsApp ke dalam komponen mandiri.
+- [ ] **12.6 Slicing Transaction Form:** Membedah `transaction_form.dart` dengan memisahkan bagian Kartu *Live Preview* kalkulasi Zakat menjadi *widget* terpisah agar logika *form* lebih mudah dibaca.
 
 ## ⏳ FASE 13: Isolasi Data Pengguna (Multi-Tenancy Skala Enterprise)
 
