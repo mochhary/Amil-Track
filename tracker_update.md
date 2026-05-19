@@ -120,8 +120,8 @@ _Fokus: Mengganti `setState` dengan Riverpod secara perlahan tanpa mengubah logi
 
 _Fokus: Membedah file UI yang terlalu bengkak (seperti `home_screen.dart`) menjadi komponen kecil yang menggunakan Riverpod untuk mengambil datanya masing-masing._
 
-- [ ] **12.1 Ekstraksi Logika Dashboard:** Membuat `dashboard_provider.dart` untuk memindahkan fungsi-fungsi berat (seperti mengambil total uang/beras dari SQLite) keluar dari UI.
-- [ ] **12.2 Slicing Home Screen (Bagian Atas):** Memecah bagian *header* dan *hero card* (Kalkulator Zakat) menjadi *widget* terpisah di dalam folder `widgets/`.
+- [x] **12.1 Ekstraksi Logika Dashboard:** Membuat `dashboard_provider.dart` untuk memindahkan fungsi-fungsi berat (seperti mengambil total uang/beras dari SQLite) keluar dari UI.
+- [x] **12.2 Slicing Home Screen (Bagian Atas):** Memecah bagian *header* dan *hero card* (Kalkulator Zakat) menjadi *widget* terpisah di dalam folder `widgets/`.
 - [ ] **12.3 Slicing Home Screen (Bagian Bawah):** Memecah *Grid Menu* dan *Recent Activity* menjadi komponen mandiri agar `home_screen.dart` menjadi sangat ringkas dan mudah dibaca.
 
 ## ⏳ FASE 13: Isolasi Data Pengguna (Multi-Tenancy Skala Enterprise)

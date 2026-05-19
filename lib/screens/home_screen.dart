@@ -3,7 +3,6 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
@@ -17,6 +16,11 @@ import 'transaction_list.dart';
 import '../services/auth_service.dart';
 import '../services/sqlite_service.dart';
 import '../services/sync_service.dart';
+
+// TIGA WIDGET SLICING KITA
+import '../widgets/hero_dashboard_card.dart';
+import '../widgets/action_grid.dart';
+import '../widgets/activity_feed.dart';
 
 class _DashboardData {
   final double totalUang;
@@ -129,7 +133,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
-  // KEY UNTUK TUTORIAL COACH MARK (5 Langkah Komprehensif)
   final GlobalKey _heroKey = GlobalKey();
   final GlobalKey _toolsKey = GlobalKey();
   final GlobalKey _chartKey = GlobalKey();
@@ -141,7 +144,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _currentUsername = widget.username;
-
     _loadAndCheckTutorial();
     _initialMagicSync();
 
@@ -197,7 +199,6 @@ class _HomeScreenState extends State<HomeScreen> {
     ).show(context: context);
   }
 
-  // CETAK BIRU TUTORIAL 5 LANGKAH (Teks diatur agar jatuh di area gelap)
   List<TargetFocus> _createTutorialTargets() {
     return [
       TargetFocus(
@@ -208,7 +209,7 @@ class _HomeScreenState extends State<HomeScreen> {
         radius: 24.0,
         contents: [
           TargetContent(
-            align: ContentAlign.bottom, // Area gelap di bawah kartu
+            align: ContentAlign.bottom,
             builder: (context, controller) {
               return Column(
                 mainAxisSize: MainAxisSize.min,
@@ -245,7 +246,7 @@ class _HomeScreenState extends State<HomeScreen> {
         radius: 24.0,
         contents: [
           TargetContent(
-            align: ContentAlign.bottom, // Area gelap di bawah kotak alat
+            align: ContentAlign.bottom,
             builder: (context, controller) {
               return Column(
                 mainAxisSize: MainAxisSize.min,
@@ -280,11 +281,10 @@ class _HomeScreenState extends State<HomeScreen> {
         alignSkip: Alignment.topRight,
         shape: ShapeLightFocus.RRect,
         radius: 16.0,
-        paddingFocus: 4.0, // Mengetatkan sorotan
+        paddingFocus: 4.0,
         contents: [
           TargetContent(
-            align: ContentAlign
-                .top, // Area gelap di ATAS chart (terhindar dari sorotan putih)
+            align: ContentAlign.top,
             builder: (context, controller) {
               return Column(
                 mainAxisSize: MainAxisSize.min,
@@ -321,7 +321,7 @@ class _HomeScreenState extends State<HomeScreen> {
         radius: 32.0,
         contents: [
           TargetContent(
-            align: ContentAlign.top, // Area gelap di atas Navbar
+            align: ContentAlign.top,
             builder: (context, controller) {
               return Column(
                 mainAxisSize: MainAxisSize.min,
@@ -337,7 +337,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   SizedBox(height: 10),
                   Text(
-                    "Beralih ke tab ini untuk mengelola akun Anda, mengubah nama identitas amil, dan melihat total rekam jejak pengabdian secara personal.",
+                    "Beralih ke tab ini untuk mengelola akun Anda, mengubah nama identitas amil, and melihat total rekam jejak pengabdian secara personal.",
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 14,
@@ -356,7 +356,7 @@ class _HomeScreenState extends State<HomeScreen> {
         alignSkip: Alignment.topRight,
         contents: [
           TargetContent(
-            align: ContentAlign.top, // Area gelap di atas tombol Plus (+)
+            align: ContentAlign.top,
             builder: (context, controller) {
               return Column(
                 mainAxisSize: MainAxisSize.min,
@@ -591,7 +591,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             140 + bottomPadding,
                           ),
                           children: [
-                            _HeroDashboardCard(
+                            HeroDashboardCard(
                                   key: _heroKey,
                                   username: _currentUsername,
                                   totalUang: data.totalUang,
@@ -616,12 +616,14 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                             const SizedBox(height: 12),
-                            // FIX: Menghapus custom toolsKey yang memicu error, diganti dengan key bawaan super class
-                            _ActionGrid(
+
+                            // MEMANGGIL WIDGET ACTION GRID KITA
+                            ActionGrid(
                               key: _toolsKey,
                               todayMuzakki: data.todayMuzakki,
                               todayUang: data.todayUang,
                             ),
+
                             const SizedBox(height: 24),
                             _DistributionMiniChart(
                               key: _chartKey,
@@ -631,7 +633,9 @@ class _HomeScreenState extends State<HomeScreen> {
                               fidyah: data.countFidyah,
                             ),
                             const SizedBox(height: 24),
-                            _ActivityFeed(
+
+                            // MEMANGGIL WIDGET ACTIVITY FEED KITA
+                            ActivityFeed(
                               transactions: data.recentTransactions,
                               onSeeAll: () async {
                                 await Navigator.of(context).push(
@@ -782,14 +786,17 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: CustomPaint(
                             painter: _CustomLiquidNotchPainter(
                               radius: 32.0,
-                              color: Colors.white.withValues(alpha: 0.45),
+                              color: Colors.transparent,
                               notchRadius: 36.0,
                             ),
                           ),
                         ),
                         Positioned.fill(
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(32),
+                          child: ClipPath(
+                            clipper: _NotchedRectangleClipper(
+                              radius: 32.0,
+                              notchRadius: 36.0,
+                            ),
                             child: BackdropFilter(
                               filter: ImageFilter.blur(
                                 sigmaX: 30.0,
@@ -797,7 +804,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: Colors.transparent,
+                                  color: Colors.white.withValues(alpha: 0.45),
                                   border: Border.all(
                                     color: Colors.white.withValues(alpha: 0.5),
                                     width: 1.5,
@@ -913,6 +920,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
+class _NotchedRectangleClipper extends CustomClipper<Path> {
+  final double radius;
+  final double notchRadius;
+
+  _NotchedRectangleClipper({required this.radius, required this.notchRadius});
+
+  @override
+  Path getClip(Size size) {
+    return _calculateNotchedPath(size, radius, notchRadius);
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+}
+
 class _CustomLiquidNotchPainter extends CustomPainter {
   final double radius;
   final Color color;
@@ -929,59 +951,7 @@ class _CustomLiquidNotchPainter extends CustomPainter {
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.fill;
-    final path = Path();
-    final double w = size.width;
-    final double h = size.height;
-
-    final double center = w / 2;
-    final double notchDepth = h * 0.72;
-    final double curveSpread = notchRadius + (w * 0.02);
-    final double bezierTension = w * 0.015;
-
-    path.moveTo(radius, 0);
-    path.lineTo(center - curveSpread, 0);
-    path.cubicTo(
-      center - notchRadius,
-      0,
-      center - notchRadius + bezierTension,
-      notchDepth,
-      center,
-      notchDepth,
-    );
-    path.cubicTo(
-      center + notchRadius - bezierTension,
-      notchDepth,
-      center + notchRadius,
-      0,
-      center + curveSpread,
-      0,
-    );
-
-    path.lineTo(w - radius, 0);
-    path.arcToPoint(
-      Offset(w, radius),
-      radius: Radius.circular(radius),
-      clockwise: true,
-    );
-    path.lineTo(w, h - radius);
-    path.arcToPoint(
-      Offset(w - radius, h),
-      radius: Radius.circular(radius),
-      clockwise: true,
-    );
-    path.lineTo(radius, h);
-    path.arcToPoint(
-      Offset(0, h - radius),
-      radius: Radius.circular(radius),
-      clockwise: true,
-    );
-    path.lineTo(0, radius);
-    path.arcToPoint(
-      Offset(radius, 0),
-      radius: Radius.circular(radius),
-      clockwise: true,
-    );
-    path.close();
+    final path = _calculateNotchedPath(size, radius, notchRadius);
     canvas.drawPath(path, paint);
   }
 
@@ -989,399 +959,60 @@ class _CustomLiquidNotchPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-class _HeroDashboardCard extends StatefulWidget {
-  final String username;
-  final double totalUang;
-  final double totalBeras;
-  final double fitrahUang;
-  final double fitrahBeras;
-  final double profesiUang;
-  final double maalUang;
-  final double fidyahUang;
-  final int todayCount;
+Path _calculateNotchedPath(Size size, double radius, double notchRadius) {
+  final path = Path();
+  final double w = size.width;
+  final double h = size.height;
 
-  const _HeroDashboardCard({
-    super.key,
-    required this.username,
-    required this.totalUang,
-    required this.totalBeras,
-    required this.fitrahUang,
-    required this.fitrahBeras,
-    required this.profesiUang,
-    required this.maalUang,
-    required this.fidyahUang,
-    required this.todayCount,
-  });
+  final double center = w / 2;
+  final double notchDepth = h * 0.72;
+  final double curveSpread = notchRadius + (w * 0.02);
+  final double bezierTension = w * 0.015;
 
-  @override
-  State<_HeroDashboardCard> createState() => _HeroDashboardCardState();
-}
-
-class _HeroDashboardCardState extends State<_HeroDashboardCard> {
-  final PageController _pageController = PageController();
-  int _currentPage = 0;
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
-
-  Widget _buildCardSlide({
-    required String title,
-    required String valueUang,
-    String? valueBeras,
-    required List<Color> colors,
-    required IconData icon,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: colors,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -15,
-            top: -15,
-            child: Icon(
-              icon,
-              size: 130,
-              color: Colors.white.withValues(alpha: 0.08),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Assalamu\'alaikum,',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.75),
-                              fontSize: 13,
-                            ),
-                          ),
-                          Text(
-                            widget.username,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.people_alt_rounded,
-                            color: Colors.white,
-                            size: 14,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${widget.todayCount} Hari Ini',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const Spacer(),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.1,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  valueUang,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                if (valueBeras != null) ...[
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.rice_bowl_rounded,
-                          color: AppColors.gold,
-                          size: 15,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          valueBeras,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final currencyFormat = NumberFormat.currency(
-      locale: 'id_ID',
-      symbol: 'Rp ',
-      decimalDigits: 0,
-    );
-
-    final slides = [
-      _buildCardSlide(
-        title: 'TOTAL SEMUA ZAKAT',
-        valueUang: currencyFormat.format(widget.totalUang),
-        valueBeras: 'Sembako Beras: ${widget.totalBeras.toStringAsFixed(1)} Kg',
-        colors: [AppColors.emeraldDeep, AppColors.emerald],
-        icon: Icons.account_balance_wallet_rounded,
-      ),
-      _buildCardSlide(
-        title: 'TOTAL ZAKAT FITRAH',
-        valueUang: currencyFormat.format(widget.fitrahUang),
-        valueBeras: 'Beras Fitrah: ${widget.fitrahBeras.toStringAsFixed(1)} Kg',
-        colors: [AppColors.emeraldDeep, Colors.teal.shade700],
-        icon: Icons.rice_bowl_rounded,
-      ),
-      _buildCardSlide(
-        title: 'TOTAL ZAKAT PROFESI',
-        valueUang: currencyFormat.format(widget.profesiUang),
-        colors: [AppColors.emeraldDeep, AppColors.orangeGold],
-        icon: Icons.work_outline_rounded,
-      ),
-      _buildCardSlide(
-        title: 'TOTAL ZAKAT MAAL',
-        valueUang: currencyFormat.format(widget.maalUang),
-        colors: [AppColors.emeraldDeep, AppColors.gold],
-        icon: Icons.account_balance_rounded,
-      ),
-      _buildCardSlide(
-        title: 'TOTAL DANA FIDYAH',
-        valueUang: currencyFormat.format(widget.fidyahUang),
-        colors: [AppColors.emeraldDeep, Colors.purple.shade700],
-        icon: Icons.calendar_today_rounded,
-      ),
-    ];
-
-    return Column(
-      children: [
-        SizedBox(
-          height: 195,
-          child: PageView(
-            controller: _pageController,
-            onPageChanged: (index) => setState(() => _currentPage = index),
-            children: slides,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(
-            slides.length,
-            (index) => AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              width: _currentPage == index ? 16 : 6,
-              height: 6,
-              decoration: BoxDecoration(
-                color: _currentPage == index
-                    ? AppColors.emeraldDeep
-                    : Colors.grey.shade400,
-                borderRadius: BorderRadius.circular(3),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ActionGrid extends StatelessWidget {
-  final int todayMuzakki;
-  final double todayUang;
-
-  const _ActionGrid({
-    super.key,
-    required this.todayMuzakki,
-    required this.todayUang,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _BeautifulActionTile(
-            icon: Icons.insights_rounded,
-            title: 'Cek\nNisab',
-            iconColor: Colors.purple,
-            bgColor: Colors.purple.withValues(alpha: 0.08),
-            onTap: () => showModalBottomSheet(
-              context: context,
-              isScrollControlled: true,
-              backgroundColor: Colors.transparent,
-              builder: (ctx) => const _NisabModal(),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _BeautifulActionTile(
-            icon: Icons.share_rounded,
-            title: 'Kirim\nRekap',
-            iconColor: Colors.blue.shade700,
-            bgColor: Colors.blue.withValues(alpha: 0.08),
-            onTap: () => showModalBottomSheet(
-              context: context,
-              isScrollControlled: true,
-              backgroundColor: Colors.transparent,
-              builder: (ctx) =>
-                  _RekapHarianModal(muzakki: todayMuzakki, uang: todayUang),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _BeautifulActionTile(
-            icon: Icons.menu_book_rounded,
-            title: 'Panduan\nFikih',
-            iconColor: Colors.teal,
-            bgColor: Colors.teal.withValues(alpha: 0.08),
-            onTap: () => _launchWithConfirmation(
-              context,
-              'https://baznas.go.id',
-              'Buka Situs BAZNAS',
-              'Anda akan diarahkan ke browser luar untuk melihat panduan resmi. Lanjutkan?',
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _BeautifulActionTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final Color iconColor;
-  final Color bgColor;
-  final VoidCallback onTap;
-  const _BeautifulActionTile({
-    required this.icon,
-    required this.title,
-    required this.iconColor,
-    required this.bgColor,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(24),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: bgColor,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icon, color: iconColor, size: 26),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                    height: 1.2,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  path.moveTo(radius, 0);
+  path.lineTo(center - curveSpread, 0);
+  path.cubicTo(
+    center - notchRadius,
+    0,
+    center - notchRadius + bezierTension,
+    notchDepth,
+    center,
+    notchDepth,
+  );
+  path.cubicTo(
+    center + notchRadius - bezierTension,
+    notchDepth,
+    center + notchRadius,
+    0,
+    center + curveSpread,
+    0,
+  );
+  path.lineTo(w - radius, 0);
+  path.arcToPoint(
+    Offset(w, radius),
+    radius: Radius.circular(radius),
+    clockwise: true,
+  );
+  path.lineTo(w, h - radius);
+  path.arcToPoint(
+    Offset(w - radius, h),
+    radius: Radius.circular(radius),
+    clockwise: true,
+  );
+  path.lineTo(radius, h);
+  path.arcToPoint(
+    Offset(0, h - radius),
+    radius: Radius.circular(radius),
+    clockwise: true,
+  );
+  path.lineTo(0, radius);
+  path.arcToPoint(
+    Offset(radius, 0),
+    radius: Radius.circular(radius),
+    clockwise: true,
+  );
+  path.close();
+  return path;
 }
 
 class _DistributionMiniChart extends StatelessWidget {
@@ -1497,147 +1128,6 @@ class _ChartIndicatorTag extends StatelessWidget {
             fontWeight: FontWeight.w700,
           ),
         ),
-      ],
-    );
-  }
-}
-
-class _ActivityFeed extends StatelessWidget {
-  final List<Map<String, dynamic>> transactions;
-  final VoidCallback onSeeAll;
-  const _ActivityFeed({required this.transactions, required this.onSeeAll});
-
-  IconData _getKategoriIcon(String kategori) {
-    switch (kategori) {
-      case 'Fitrah':
-        return Icons.rice_bowl_rounded;
-      case 'Profesi':
-        return Icons.work_outline_rounded;
-      case 'Maal':
-        return Icons.account_balance_rounded;
-      case 'Fidyah':
-        return Icons.calendar_today_rounded;
-      default:
-        return Icons.payments_rounded;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final currencyFormat = NumberFormat.currency(
-      locale: 'id_ID',
-      symbol: 'Rp ',
-      decimalDigits: 0,
-    );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Setoran Terkini',
-              style: TextStyle(
-                fontWeight: FontWeight.w900,
-                fontSize: 16,
-                color: AppColors.emeraldDeep,
-              ),
-            ),
-            TextButton(
-              onPressed: onSeeAll,
-              child: const Text(
-                'Lihat Semua',
-                style: TextStyle(
-                  color: AppColors.emerald,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ],
-        ),
-        if (transactions.isEmpty)
-          SoftSurfaceCard(
-            backgroundColor: Colors.white.withValues(alpha: 0.85),
-            child: const Padding(
-              padding: EdgeInsets.all(24.0),
-              child: Center(
-                child: Text(
-                  'Belum ada transaksi.',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-            ),
-          )
-        else
-          ...transactions.map((tx) {
-            final String nama =
-                tx[SqliteService.columnNamaMuzakki] ?? 'Hamba Allah';
-            final String kategori =
-                tx[SqliteService.columnKategoriZakat] ?? 'Fitrah';
-            final double jumlah = tx[SqliteService.columnJumlah] ?? 0.0;
-            final String satuan = tx[SqliteService.columnTipeSatuan] ?? 'uang';
-            final String displayJumlah = (satuan == 'beras')
-                ? '${jumlah.toStringAsFixed(1)} Kg'
-                : currencyFormat.format(jumlah);
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: SoftSurfaceCard(
-                backgroundColor: Colors.white.withValues(alpha: 0.9),
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppColors.softSurface,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        _getKategoriIcon(kategori),
-                        size: 20,
-                        color: AppColors.emeraldDeep,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            nama,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 15,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Zakat $kategori',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Text(
-                      displayJumlah,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 15,
-                        color: AppColors.emeraldDeep,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }),
       ],
     );
   }
@@ -1876,7 +1366,6 @@ class _ProfileTabContentState extends State<_ProfileTabContent> {
             ],
           ),
         ),
-
         const SizedBox(height: 24),
         const Align(
           alignment: Alignment.centerLeft,
@@ -1958,9 +1447,7 @@ class _ProfileTabContentState extends State<_ProfileTabContent> {
                   try {
                     await widget.onLogout();
                   } finally {
-                    if (mounted) {
-                      setState(() => _working = false);
-                    }
+                    if (mounted) setState(() => _working = false);
                   }
                 },
         ),
@@ -1990,14 +1477,12 @@ class _EditProfileModal extends StatefulWidget {
   final String currentName;
   final Function(String) onSave;
   const _EditProfileModal({required this.currentName, required this.onSave});
-
   @override
   State<_EditProfileModal> createState() => _EditProfileModalState();
 }
 
 class _EditProfileModalState extends State<_EditProfileModal> {
   late TextEditingController _nameController;
-
   @override
   void initState() {
     super.initState();
@@ -2112,265 +1597,6 @@ class _EditProfileModalState extends State<_EditProfileModal> {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _NisabModal extends StatelessWidget {
-  const _NisabModal();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: GlassContainer(
-        width: double.infinity,
-        borderRadius: 28,
-        padding: const EdgeInsets.all(28),
-        backgroundColor: AppColors.emeraldDeep.withValues(alpha: 0.85),
-        glassOpacity: 0.9,
-        blur: 20,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 45,
-              height: 5,
-              decoration: BoxDecoration(
-                color: Colors.white30,
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Informasi Nisab & Ketetapan',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 19,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const Text(
-              'Standar acuan yang berlaku saat ini',
-              style: TextStyle(
-                color: AppColors.gold,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(22),
-              decoration: BoxDecoration(
-                color: Colors.black12,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white12),
-              ),
-              child: Column(
-                children: [
-                  _buildInfoRow('Zakat Fitrah', 'Rp 40.000 / 2.5 Kg'),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Divider(color: Colors.white12, height: 1),
-                  ),
-                  _buildInfoRow('Zakat Profesi', 'Rp 6.859.394 / Bln'),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Divider(color: Colors.white12, height: 1),
-                  ),
-                  _buildInfoRow('Zakat Maal', 'Rp 82.312.725 / Thn'),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Divider(color: Colors.white12, height: 1),
-                  ),
-                  _buildInfoRow('Fidyah', 'Rp 60.000 / Hari'),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.emerald,
-                foregroundColor: Colors.white,
-                minimumSize: const Size(double.infinity, 54),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                elevation: 0,
-              ),
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'Tutup',
-                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String title, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        Text(
-          value,
-          style: const TextStyle(
-            color: AppColors.gold,
-            fontSize: 15,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _RekapHarianModal extends StatelessWidget {
-  final int muzakki;
-  final double uang;
-  const _RekapHarianModal({required this.muzakki, required this.uang});
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassContainer(
-      width: double.infinity,
-      borderRadius: 28,
-      padding: const EdgeInsets.all(28),
-      backgroundColor: AppColors.emeraldDeep.withValues(alpha: 0.85),
-      glassOpacity: 0.9,
-      blur: 20,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.white30,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'Rekapitulasi Hari Ini',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Total perolehan selama Anda bertugas hari ini.',
-            style: TextStyle(
-              color: AppColors.gold,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.all(22),
-            decoration: BoxDecoration(
-              color: Colors.black12,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white12),
-            ),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Total Muzakki',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      '$muzakki Jiwa',
-                      style: const TextStyle(
-                        color: AppColors.gold,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
-                ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  child: Divider(color: Colors.white12, height: 1),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Dana Terhimpun',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      NumberFormat.currency(
-                        locale: 'id_ID',
-                        symbol: 'Rp ',
-                        decimalDigits: 0,
-                      ).format(uang),
-                      style: const TextStyle(
-                        color: AppColors.gold,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.send_rounded, size: 20),
-            label: const Text(
-              'Kirim Laporan ke WhatsApp',
-              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.emerald,
-              foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 54),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              elevation: 0,
-            ),
-            onPressed: () {
-              Navigator.pop(context);
-              _launchWithConfirmation(
-                context,
-                'https://wa.me/?text=Laporan%20Rekap%20Harian%0AMuzakki:%20$muzakki%20Jiwa%0ADana:%20Rp%20$uang',
-                'Bagikan via WhatsApp',
-                'Buka WhatsApp untuk membagikan laporan singkat ini ke Koordinator?',
-              );
-            },
-          ),
-        ],
       ),
     );
   }
