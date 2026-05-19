@@ -1,29 +1,10 @@
 // ignore_for_file: deprecated_member_use
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'package:intl/intl.dart';
 
 import '../core/constants.dart';
 import '../services/sqlite_service.dart';
-
-class CurrencyInputFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    if (newValue.text.isEmpty) return newValue;
-    String digitsOnly = newValue.text.replaceAll(RegExp(r'[^\d]'), '');
-    if (digitsOnly.isEmpty) return const TextEditingValue(text: '');
-    final number = int.parse(digitsOnly);
-    final newString = NumberFormat.decimalPattern('id').format(number);
-    return TextEditingValue(
-      text: newString,
-      selection: TextSelection.collapsed(offset: newString.length),
-    );
-  }
-}
+import '../utils/currency_input_formatter.dart';
+import '../widgets/zakat_preview_card.dart';
 
 class TransactionFormScreen extends StatefulWidget {
   const TransactionFormScreen({super.key});
@@ -186,12 +167,6 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final currencyFormat = NumberFormat.currency(
-      locale: 'id_ID',
-      symbol: 'Rp ',
-      decimalDigits: 0,
-    );
-
     return Scaffold(
       backgroundColor: AppColors.softSurface,
       appBar: AppBar(
@@ -517,87 +492,11 @@ class _TransactionFormScreenState extends State<TransactionFormScreen> {
             ),
             const SizedBox(height: 20),
 
-            Container(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppColors.emeraldDeep, AppColors.emerald],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.emerald.withValues(alpha: 0.3),
-                        blurRadius: 15,
-                        offset: const Offset(0, 5),
-                      ),
-                    ],
-                  ),
-                  padding: const EdgeInsets.all(20),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.15),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          _selectedKategori == 'Fitrah' &&
-                                  _tipeSatuanFitrah == 'beras'
-                              ? Icons.rice_bowl_rounded
-                              : Icons.auto_awesome_rounded,
-                          color: AppColors.gold,
-                          size: 28,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'LIVE PREVIEW WAJIB BAYAR',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 1,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              _selectedKategori == 'Fitrah' &&
-                                      _tipeSatuanFitrah == 'beras'
-                                  ? '${_calculatedJumlah.toStringAsFixed(1)} Kg Beras'
-                                  : currencyFormat.format(_calculatedJumlah),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 24,
-                                letterSpacing: -0.5,
-                              ),
-                            ),
-                            if (_selectedKategori == 'Profesi' &&
-                                _calculatedJumlah == 0.0) ...[
-                              const SizedBox(height: 2),
-                              Text(
-                                'Belum mencapai nisab harian/bulanan.',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.7),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-                .animate(target: _calculatedJumlah > 0 ? 1 : 0)
-                .shimmer(duration: 1200.ms),
+            ZakatPreviewCard(
+              selectedKategori: _selectedKategori,
+              tipeSatuanFitrah: _tipeSatuanFitrah,
+              calculatedJumlah: _calculatedJumlah,
+            ),
             const SizedBox(height: 32),
 
             ElevatedButton(
