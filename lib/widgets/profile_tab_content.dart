@@ -1,3 +1,4 @@
+import 'package:amil_track/utils/dialog_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -351,7 +352,8 @@ class _ProfileTabContentState extends State<ProfileTabContent> {
                 Colors.indigo,
                 'Hotline Dewan Syariah',
                 'Konsultasi kasus fikih via WhatsApp',
-                () => _launchWithConfirmation(
+                // Ganti bagian onTap Hotline menjadi:
+                () => DialogUtils.launchWithConfirmation(
                   context,
                   'https://wa.me/628123456789?text=Assalamu%27alaikum...',
                   'Buka WhatsApp',

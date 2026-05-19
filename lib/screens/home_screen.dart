@@ -5,67 +5,29 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/constants.dart';
-// soft surface and glass widgets moved to sliced widget file; import when needed in widgets
 import '../widgets/app_watermark_background.dart';
-import '../widgets/profile_tab_content.dart';
 import 'transaction_form.dart';
 import 'transaction_list.dart';
 import '../services/auth_service.dart';
-import '../services/sqlite_service.dart';
 import '../services/sync_service.dart';
+import '../providers/dashboard_provider.dart';
 
-// TIGA WIDGET SLICING KITA
 import '../widgets/hero_dashboard_card.dart';
 import '../widgets/action_grid.dart';
 import '../widgets/activity_feed.dart';
+import '../widgets/profile_tab_content.dart';
 
-class _DashboardData {
-  final double totalUang;
-  final double totalBeras;
-  final double fitrahUang;
-  final double fitrahBeras;
-  final double profesiUang;
-  final double maalUang;
-  final double fidyahUang;
-  final int countFitrah;
-  final int countProfesi;
-  final int countMaal;
-  final int countFidyah;
-  final int todayMuzakki;
-  final double todayUang;
-  final List<Map<String, dynamic>> recentTransactions;
-
-  const _DashboardData({
-    this.totalUang = 0,
-    this.totalBeras = 0,
-    this.fitrahUang = 0,
-    this.fitrahBeras = 0,
-    this.profesiUang = 0,
-    this.maalUang = 0,
-    this.fidyahUang = 0,
-    this.countFitrah = 0,
-    this.countProfesi = 0,
-    this.countMaal = 0,
-    this.countFidyah = 0,
-    this.todayMuzakki = 0,
-    this.todayUang = 0,
-    this.recentTransactions = const [],
-  });
-}
-
-// moved launch helper into sliced widget file
-
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key, required this.username});
   final String username;
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  late Future<_DashboardData> _dashboardFuture;
+class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _selectedTab = 0;
   bool _isOnline = true;
   bool _wasOffline = false;
@@ -84,16 +46,13 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _currentUsername = widget.username;
-    _loadAndCheckTutorial();
     _initialMagicSync();
 
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
       List<ConnectivityResult> results,
     ) {
       if (results.contains(ConnectivityResult.none)) {
-        if (_isOnline && mounted) {
-          setState(() => _isOnline = false);
-        }
+        if (_isOnline && mounted) setState(() => _isOnline = false);
       } else {
         _backgroundSync();
       }
@@ -104,25 +63,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _connectivitySubscription?.cancel();
     super.dispose();
-  }
-
-  void _loadAndCheckTutorial() {
-    _dashboardFuture = _loadDashboardData();
-    _dashboardFuture.then((data) {
-      final int totalSemua =
-          data.countFitrah +
-          data.countProfesi +
-          data.countMaal +
-          data.countFidyah;
-      if (totalSemua == 0 && !_hasShownTutorial && mounted) {
-        _hasShownTutorial = true;
-        Future.delayed(const Duration(milliseconds: 600), () {
-          if (mounted && _selectedTab == 0) {
-            _showTutorial();
-          }
-        });
-      }
-    });
   }
 
   void _showTutorial() {
@@ -150,31 +90,29 @@ class _HomeScreenState extends State<HomeScreen> {
         contents: [
           TargetContent(
             align: ContentAlign.bottom,
-            builder: (context, controller) {
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
-                    "1. Ringkasan Saldo",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 20,
-                    ),
+            builder: (context, controller) => Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  "1. Ringkasan Saldo",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 20,
                   ),
-                  SizedBox(height: 10),
-                  Text(
-                    "Ini adalah kartu saldo utama Anda. Anda bisa MENGGESER kartu ini ke kiri/kanan untuk melihat total perolehan spesifik dari setiap kategori Zakat.",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      height: 1.4,
-                    ),
+                ),
+                SizedBox(height: 10),
+                Text(
+                  "Ini adalah kartu saldo utama Anda. Anda bisa MENGGESER kartu ini ke kiri/kanan untuk melihat total perolehan spesifik dari setiap kategori Zakat.",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    height: 1.4,
                   ),
-                ],
-              );
-            },
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -187,31 +125,29 @@ class _HomeScreenState extends State<HomeScreen> {
         contents: [
           TargetContent(
             align: ContentAlign.bottom,
-            builder: (context, controller) {
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
-                    "2. Peralatan Pintar",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 20,
-                    ),
+            builder: (context, controller) => Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  "2. Peralatan Pintar",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 20,
                   ),
-                  SizedBox(height: 10),
-                  Text(
-                    "Gunakan menu ini untuk mengecek harga Nisab terkini, mengirim rekap harian ke koordinator, atau membaca panduan Fikih resmi BAZNAS.",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      height: 1.4,
-                    ),
+                ),
+                SizedBox(height: 10),
+                Text(
+                  "Gunakan menu ini untuk mengecek harga Nisab terkini, mengirim rekap harian ke koordinator, atau membaca panduan Fikih resmi BAZNAS.",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    height: 1.4,
                   ),
-                ],
-              );
-            },
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -225,31 +161,29 @@ class _HomeScreenState extends State<HomeScreen> {
         contents: [
           TargetContent(
             align: ContentAlign.top,
-            builder: (context, controller) {
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
-                    "3. Metrik Visual",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 20,
-                    ),
+            builder: (context, controller) => Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  "3. Metrik Visual",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 20,
                   ),
-                  SizedBox(height: 10),
-                  Text(
-                    "Pantau persentase sebaran penerimaan zakat secara sekilas melalui indikator warna ini. Bar warna akan otomatis menyesuaikan diri seiring bertambahnya data.",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      height: 1.4,
-                    ),
+                ),
+                SizedBox(height: 10),
+                Text(
+                  "Pantau persentase sebaran penerimaan zakat secara sekilas melalui indikator warna ini. Bar warna akan otomatis menyesuaikan diri seiring bertambahnya data.",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    height: 1.4,
                   ),
-                ],
-              );
-            },
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -262,31 +196,29 @@ class _HomeScreenState extends State<HomeScreen> {
         contents: [
           TargetContent(
             align: ContentAlign.top,
-            builder: (context, controller) {
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
-                    "4. Profil & Pengaturan",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 20,
-                    ),
+            builder: (context, controller) => Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  "4. Profil & Pengaturan",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 20,
                   ),
-                  SizedBox(height: 10),
-                  Text(
-                    "Beralih ke tab ini untuk mengelola akun Anda, mengubah nama identitas amil, and melihat total rekam jejak pengabdian secara personal.",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      height: 1.4,
-                    ),
+                ),
+                SizedBox(height: 10),
+                Text(
+                  "Beralih ke tab ini untuk mengelola akun Anda, mengubah nama identitas amil, and melihat total rekam jejak pengabdian secara personal.",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    height: 1.4,
                   ),
-                ],
-              );
-            },
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -297,31 +229,29 @@ class _HomeScreenState extends State<HomeScreen> {
         contents: [
           TargetContent(
             align: ContentAlign.top,
-            builder: (context, controller) {
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
-                    "5. Catat Setoran Zakat",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 20,
-                    ),
+            builder: (context, controller) => Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  "5. Catat Setoran Zakat",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 20,
                   ),
-                  SizedBox(height: 10),
-                  Text(
-                    "Tekan tombol ini setiap kali ada Muzakki yang menyerahkan Zakat/Fidyah. Mari kita mulai menggunakan Amil Track!",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      height: 1.4,
-                    ),
+                ),
+                SizedBox(height: 10),
+                Text(
+                  "Tekan tombol ini setiap kali ada Muzakki yang menyerahkan Zakat/Fidyah. Mari kita mulai menggunakan Amil Track!",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    height: 1.4,
                   ),
-                ],
-              );
-            },
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -364,63 +294,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _refreshDashboard() {
     if (mounted) {
-      setState(() {
-        _dashboardFuture = _loadDashboardData();
-      });
+      ref.invalidate(localDashboardProvider);
     }
-  }
-
-  Future<_DashboardData> _loadDashboardData() async {
-    final db = await SqliteService.instance.database;
-    final todayStr = DateTime.now().toIso8601String().substring(0, 10);
-
-    final String aggregateQuery =
-        '''
-      SELECT 
-        SUM(CASE WHEN ${SqliteService.columnTipeSatuan} = 'uang' THEN ${SqliteService.columnJumlah} ELSE 0 END) as totalUang,
-        SUM(CASE WHEN ${SqliteService.columnTipeSatuan} = 'beras' THEN ${SqliteService.columnJumlah} ELSE 0 END) as totalBeras,
-        SUM(CASE WHEN ${SqliteService.columnKategoriZakat} = 'Fitrah' AND ${SqliteService.columnTipeSatuan} = 'uang' THEN ${SqliteService.columnJumlah} ELSE 0 END) as fitrahUang,
-        SUM(CASE WHEN ${SqliteService.columnKategoriZakat} = 'Fitrah' AND ${SqliteService.columnTipeSatuan} = 'beras' THEN ${SqliteService.columnJumlah} ELSE 0 END) as fitrahBeras,
-        SUM(CASE WHEN ${SqliteService.columnKategoriZakat} = 'Profesi' THEN ${SqliteService.columnJumlah} ELSE 0 END) as profesiUang,
-        SUM(CASE WHEN ${SqliteService.columnKategoriZakat} = 'Maal' THEN ${SqliteService.columnJumlah} ELSE 0 END) as maalUang,
-        SUM(CASE WHEN ${SqliteService.columnKategoriZakat} = 'Fidyah' THEN ${SqliteService.columnJumlah} ELSE 0 END) as fidyahUang,
-        SUM(CASE WHEN ${SqliteService.columnKategoriZakat} = 'Fitrah' THEN 1 ELSE 0 END) as countFitrah,
-        SUM(CASE WHEN ${SqliteService.columnKategoriZakat} = 'Profesi' THEN 1 ELSE 0 END) as countProfesi,
-        SUM(CASE WHEN ${SqliteService.columnKategoriZakat} = 'Maal' THEN 1 ELSE 0 END) as countMaal,
-        SUM(CASE WHEN ${SqliteService.columnKategoriZakat} = 'Fidyah' THEN 1 ELSE 0 END) as countFidyah,
-        SUM(CASE WHEN ${SqliteService.columnCreatedAt} LIKE '$todayStr%' THEN 1 ELSE 0 END) as todayMuzakki,
-        SUM(CASE WHEN ${SqliteService.columnTipeSatuan} = 'uang' AND ${SqliteService.columnCreatedAt} LIKE '$todayStr%' THEN ${SqliteService.columnJumlah} ELSE 0 END) as todayUang
-      FROM ${SqliteService.tableTransactions}
-    ''';
-
-    final futures = await Future.wait([
-      db.rawQuery(aggregateQuery),
-      db.query(
-        SqliteService.tableTransactions,
-        orderBy: '${SqliteService.columnCreatedAt} DESC',
-        limit: 4,
-      ),
-    ]);
-
-    final agg = futures[0].isNotEmpty ? futures[0].first : {};
-    final recentTransactions = futures[1] as List<Map<String, dynamic>>;
-
-    return _DashboardData(
-      totalUang: (agg['totalUang'] as num?)?.toDouble() ?? 0.0,
-      totalBeras: (agg['totalBeras'] as num?)?.toDouble() ?? 0.0,
-      fitrahUang: (agg['fitrahUang'] as num?)?.toDouble() ?? 0.0,
-      fitrahBeras: (agg['fitrahBeras'] as num?)?.toDouble() ?? 0.0,
-      profesiUang: (agg['profesiUang'] as num?)?.toDouble() ?? 0.0,
-      maalUang: (agg['maalUang'] as num?)?.toDouble() ?? 0.0,
-      fidyahUang: (agg['fidyahUang'] as num?)?.toDouble() ?? 0.0,
-      countFitrah: agg['countFitrah'] as int? ?? 0,
-      countProfesi: agg['countProfesi'] as int? ?? 0,
-      countMaal: agg['countMaal'] as int? ?? 0,
-      countFidyah: agg['countFidyah'] as int? ?? 0,
-      todayMuzakki: agg['todayMuzakki'] as int? ?? 0,
-      todayUang: (agg['todayUang'] as num?)?.toDouble() ?? 0.0,
-      recentTransactions: recentTransactions,
-    );
   }
 
   Widget _buildClassicNavItem({
@@ -484,30 +359,37 @@ class _HomeScreenState extends State<HomeScreen> {
         navBarBottomSpacing + (navBarHeight / 2) - (fabSize / 2) + 12.0;
     final double fabLeftPos = (screenSize.width / 2) - (fabSize / 2);
 
+    final dashboardAsync = ref.watch(localDashboardProvider);
+
     return AppWatermarkBackground(
       child: Scaffold(
         extendBody: true,
         backgroundColor: Colors.transparent,
-        body: FutureBuilder<_DashboardData>(
-          future: _dashboardFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(
-                child: CircularProgressIndicator(color: AppColors.emeraldDeep),
-              );
-            } else if (snapshot.hasError) {
-              return Center(
-                child: Text(
-                  'Gagal memuat data dashboard: ${snapshot.error}',
-                  style: const TextStyle(
-                    color: Colors.red,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              );
+        body: dashboardAsync.when(
+          loading: () => const Center(
+            child: CircularProgressIndicator(color: AppColors.emeraldDeep),
+          ),
+          error: (error, stack) => Center(
+            child: Text(
+              'Gagal memuat data: $error',
+              style: const TextStyle(
+                color: Colors.red,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          data: (data) {
+            final int totalSemua =
+                data.countFitrah +
+                data.countProfesi +
+                data.countMaal +
+                data.countFidyah;
+            if (totalSemua == 0 && !_hasShownTutorial) {
+              _hasShownTutorial = true;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted && _selectedTab == 0) _showTutorial();
+              });
             }
-
-            final data = snapshot.data ?? const _DashboardData();
 
             return Stack(
               children: [
@@ -556,14 +438,11 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                             const SizedBox(height: 12),
-
-                            // MEMANGGIL WIDGET ACTION GRID KITA
                             ActionGrid(
                               key: _toolsKey,
                               todayMuzakki: data.todayMuzakki,
                               todayUang: data.todayUang,
                             ),
-
                             const SizedBox(height: 24),
                             _DistributionMiniChart(
                               key: _chartKey,
@@ -573,8 +452,6 @@ class _HomeScreenState extends State<HomeScreen> {
                               fidyah: data.countFidyah,
                             ),
                             const SizedBox(height: 24),
-
-                            // MEMANGGIL WIDGET ACTIVITY FEED KITA
                             ActivityFeed(
                               transactions: data.recentTransactions,
                               onSeeAll: () async {
@@ -617,9 +494,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               setState(() => _selectedTab = 0);
                               Future.delayed(
                                 const Duration(milliseconds: 300),
-                                () {
-                                  _showTutorial();
-                                },
+                                _showTutorial,
                               );
                             },
                           ),
@@ -863,14 +738,9 @@ class _HomeScreenState extends State<HomeScreen> {
 class _NotchedRectangleClipper extends CustomClipper<Path> {
   final double radius;
   final double notchRadius;
-
   _NotchedRectangleClipper({required this.radius, required this.notchRadius});
-
   @override
-  Path getClip(Size size) {
-    return _calculateNotchedPath(size, radius, notchRadius);
-  }
-
+  Path getClip(Size size) => _calculateNotchedPath(size, radius, notchRadius);
   @override
   bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }
@@ -879,20 +749,17 @@ class _CustomLiquidNotchPainter extends CustomPainter {
   final double radius;
   final Color color;
   final double notchRadius;
-
   _CustomLiquidNotchPainter({
     required this.radius,
     required this.color,
     required this.notchRadius,
   });
-
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.fill;
-    final path = _calculateNotchedPath(size, radius, notchRadius);
-    canvas.drawPath(path, paint);
+    canvas.drawPath(_calculateNotchedPath(size, radius, notchRadius), paint);
   }
 
   @override
@@ -903,7 +770,6 @@ Path _calculateNotchedPath(Size size, double radius, double notchRadius) {
   final path = Path();
   final double w = size.width;
   final double h = size.height;
-
   final double center = w / 2;
   final double notchDepth = h * 0.72;
   final double curveSpread = notchRadius + (w * 0.02);
@@ -956,10 +822,7 @@ Path _calculateNotchedPath(Size size, double radius, double notchRadius) {
 }
 
 class _DistributionMiniChart extends StatelessWidget {
-  final int fitrah;
-  final int profesi;
-  final int maal;
-  final int fidyah;
+  final int fitrah, profesi, maal, fidyah;
   const _DistributionMiniChart({
     super.key,
     required this.fitrah,

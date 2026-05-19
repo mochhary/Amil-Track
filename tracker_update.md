@@ -126,6 +126,9 @@ _Fokus: Membedah file UI yang terlalu bengkak (seperti `home_screen.dart`) menja
 - [x] **12.4 Slicing Home Screen (Tab Profile):** 
 - [x] **12.5 Slicing Transaction List:** 
 - [x] **12.6 Slicing Transaction Form:** 
+- [x] **12.7 Refactoring Enterprise (Part 1):** Membuat `dialog_utils.dart` dan merombak `dashboard_provider.dart` untuk *caching* Riverpod.
+- [x] **12.8 Integrasi Riverpod di Beranda:** Mengubah `HomeScreen` menjadi `ConsumerStatefulWidget` dan menggunakan `localDashboardProvider` untuk memuat data tanpa `setState`.
+- [ ] **12.9 Implementasi Pusat Utilitas:** Memperbarui `action_grid.dart` dan `profile_tab_content.dart` agar menggunakan fungsi dari `DialogUtils` secara terpusat.
 
 ## ⏳ FASE 13: Isolasi Data Pengguna (Multi-Tenancy Skala Enterprise)
 
