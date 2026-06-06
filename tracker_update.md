@@ -143,6 +143,9 @@ _Fokus: Memastikan privasi dan keamanan data; Amil A tidak boleh bisa melihat, m
 
 - [x] **13.1 Modifikasi Skema SQLite Lokal:** Melakukan migrasi database di `sqlite_service.dart` untuk menambahkan kolom krusial `user_id` pada setiap baris transaksi yang dicatat.
 - [x] **13.2 Filter Query & Restrukturisasi Auto-Sync:** Mengubah logika agregasi _dashboard_ dan otak sinkronisasi (`sync_service.dart`) agar selalu mengunci data pada `WHERE user_id = current_user_id`.
+- [ ] **13.3 Jika hapus akun, maka data lokal maupun online (supabase) hilang:** 
+- [ ] **13.4 hapus akun konfirmasinya 2 kali, jadi selain ada dialog konfirmasi dari bawah, ada juga konfirmasi modal ditengah seperti menginput "Iya, Hapus akun saya":** 
+
 
 ## ⏳ FASE 14: Keamanan Tingkat Lanjut & Native Login (Fase Ekspansi)
 
