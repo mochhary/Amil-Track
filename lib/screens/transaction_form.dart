@@ -35,6 +35,7 @@ class TransactionFormScreen extends ConsumerStatefulWidget {
 class _TransactionFormScreenState extends ConsumerState<TransactionFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _namaController = TextEditingController();
+  final _waController = TextEditingController(); // NEW: WA Controller
   final _jiwaController = TextEditingController(text: '1');
   final _gajiController = TextEditingController();
   final _bonusController = TextEditingController();
@@ -58,6 +59,7 @@ class _TransactionFormScreenState extends ConsumerState<TransactionFormScreen> {
   @override
   void dispose() {
     _namaController.dispose();
+    _waController.dispose(); // NEW: Dispose WA Controller
     _jiwaController.dispose();
     _gajiController.dispose();
     _bonusController.dispose();
@@ -101,6 +103,7 @@ class _TransactionFormScreenState extends ConsumerState<TransactionFormScreen> {
         .read(zakatCalculatorProvider.notifier)
         .saveTransaction(
           namaMuzakki: _namaController.text.trim(),
+          nomorWhatsapp: _waController.text.trim(),
           jumlahJiwa: state.kategori == 'Fitrah'
               ? int.tryParse(_jiwaController.text.replaceAll('.', ''))
               : null,
@@ -109,6 +112,63 @@ class _TransactionFormScreenState extends ConsumerState<TransactionFormScreen> {
     if (success && mounted) {
       Navigator.pop(context, true); // Kembali ke Beranda & trigger refresh
     }
+  }
+
+  // --- FUNGSI HELPER UI ---
+  String _getCategoryInfo(String kategori) {
+    switch (kategori) {
+      case 'Fitrah':
+        return 'Zakat yang diwajibkan atas setiap jiwa baik lelaki dan perempuan muslim yang dilakukan pada bulan Ramadhan.';
+      case 'Profesi':
+        return 'Zakat yang dikenakan pada tiap pekerjaan atau keahlian profesional yang telah mencapai nisab.';
+      case 'Maal':
+        return 'Zakat atas harta yang dimiliki secara penuh dan telah mencapai nisab serta haul (1 tahun).';
+      case 'Fidyah':
+        return 'Denda yang wajib dibayar karena meninggalkan puasa wajib dengan alasan yang dibenarkan syariat.';
+      default:
+        return '';
+    }
+  }
+
+  Widget _buildCategoryChip(String label, IconData icon, ZakatState state, ZakatCalculatorNotifier notifier) {
+    final isSelected = state.kategori == label;
+    return ChoiceChip(
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 16,
+            color: isSelected ? Colors.white : AppColors.emeraldDeep,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: isSelected ? Colors.white : AppColors.textPrimary,
+            ),
+          ),
+        ],
+      ),
+      selected: isSelected,
+      selectedColor: AppColors.emeraldDeep,
+      backgroundColor: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: isSelected ? Colors.transparent : AppColors.border,
+        ),
+      ),
+      onSelected: (val) {
+        if (val) {
+          notifier.setKategori(label);
+          _triggerCalculate();
+        }
+      },
+    );
   }
 
   // --- UI RENDERER ---
@@ -141,24 +201,47 @@ class _TransactionFormScreenState extends ConsumerState<TransactionFormScreen> {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: TextFormField(
-                controller: _namaController,
-                validator: (val) => val == null || val.isEmpty
-                    ? 'Nama Muzakki wajib diisi'
-                    : null,
-                decoration: InputDecoration(
-                  labelText: 'Nama Lengkap Muzakki *',
-                  prefixIcon: const Icon(
-                    Icons.person_rounded,
-                    color: AppColors.emeraldDeep,
+              child: Column(
+                children: [
+                  TextFormField(
+                    controller: _namaController,
+                    validator: (val) => val == null || val.isEmpty
+                        ? 'Nama Muzakki wajib diisi'
+                        : null,
+                    decoration: InputDecoration(
+                      labelText: 'Nama Lengkap Muzakki *',
+                      prefixIcon: const Icon(
+                        Icons.person_rounded,
+                        color: AppColors.emeraldDeep,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      filled: true,
+                      fillColor: AppColors.softSurface,
+                    ),
                   ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _waController,
+                    keyboardType: TextInputType.phone,
+                    decoration: InputDecoration(
+                      labelText: 'Nomor WhatsApp (Opsional)',
+                      hintText: 'Contoh: 0812...',
+                      prefixIcon: const Icon(
+                        Icons.phone_rounded,
+                        color: AppColors.emeraldDeep,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      filled: true,
+                      fillColor: AppColors.softSurface,
+                    ),
                   ),
-                  filled: true,
-                  fillColor: AppColors.softSurface,
-                ),
+                ],
               ),
             ),
             const SizedBox(height: 24),
@@ -172,36 +255,46 @@ class _TransactionFormScreenState extends ConsumerState<TransactionFormScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            Row(
-              children: ['Fitrah', 'Profesi', 'Maal', 'Fidyah'].map((kat) {
-                final isSelected = zakatState.kategori == kat;
-                return Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 6.0),
-                    child: ChoiceChip(
-                      label: Text(
-                        kat,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isSelected
-                              ? Colors.white
-                              : AppColors.textSecondary,
-                          fontWeight: FontWeight.bold,
-                        ),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildCategoryChip('Fitrah', Icons.rice_bowl_rounded, zakatState, notifier),
+                  const SizedBox(width: 8),
+                  _buildCategoryChip('Profesi', Icons.work_rounded, zakatState, notifier),
+                  const SizedBox(width: 8),
+                  _buildCategoryChip('Maal', Icons.monetization_on_rounded, zakatState, notifier),
+                  const SizedBox(width: 8),
+                  _buildCategoryChip('Fidyah', Icons.restaurant_rounded, zakatState, notifier),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Informasi Kategori
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.emeraldDeep.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.emeraldDeep.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.info_outline_rounded, color: AppColors.emeraldDeep, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _getCategoryInfo(zakatState.kategori),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.emeraldDeep,
+                        height: 1.4,
                       ),
-                      selected: isSelected,
-                      selectedColor: AppColors.emeraldDeep,
-                      backgroundColor: Colors.white,
-                      onSelected: (val) {
-                        if (val) {
-                          notifier.setKategori(kat);
-                          _triggerCalculate();
-                        }
-                      },
                     ),
                   ),
-                );
-              }).toList(),
+                ],
+              ),
             ),
             const SizedBox(height: 24),
 

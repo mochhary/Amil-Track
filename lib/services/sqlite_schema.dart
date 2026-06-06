@@ -16,6 +16,7 @@ class SqliteSchema {
   static final String jumlah = _decode('anVtbGFo');
   static final String tipeSatuan = _decode('dGlwZV9zYXR1YW4=');
   static final String jumlahJiwa = _decode('anVtbGFoX2ppd2E=');
+  static final String nomorWhatsapp = _decode('bm9tb3Jfd2hhdHNhcHA=');
   static final String createdAt = _decode('Y3JlYXRlZF9hdA==');
   static final String syncStatus = _decode('c3luY19zdGF0dXM=');
 }

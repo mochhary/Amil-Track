@@ -5,8 +5,8 @@ import 'sqlite_schema.dart';
 
 class SqliteService {
   static const String databaseName = "amil_track.db";
-  // FIX: Naik ke versi 3 untuk menambahkan kolom jumlah_jiwa
-  static const int databaseVersion = 3;
+  // FIX: Naik ke versi 4 untuk menambahkan kolom nomor_whatsapp (dan hindari drop table)
+  static const int databaseVersion = 4;
 
   // Schema identifiers are exposed through a single abstraction gateway.
   static String get tableTransactions => SqliteSchema.transactionsTable;
@@ -17,6 +17,7 @@ class SqliteService {
   static String get columnJumlah => SqliteSchema.jumlah;
   static String get columnTipeSatuan => SqliteSchema.tipeSatuan;
   static String get columnJumlahJiwa => SqliteSchema.jumlahJiwa;
+  static String get columnNomorWhatsapp => SqliteSchema.nomorWhatsapp;
   static String get columnCreatedAt => SqliteSchema.createdAt;
   static String get columnSyncStatus => SqliteSchema.syncStatus;
 
@@ -50,6 +51,7 @@ class SqliteService {
         $columnJumlah REAL NOT NULL,
         $columnTipeSatuan TEXT NOT NULL,
         $columnJumlahJiwa INTEGER, 
+        $columnNomorWhatsapp TEXT,
         $columnCreatedAt TEXT NOT NULL,
         $columnSyncStatus INTEGER DEFAULT 0
       )
@@ -57,7 +59,13 @@ class SqliteService {
   }
 
   Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    await db.execute('DROP TABLE IF EXISTS $tableTransactions');
-    await _onCreate(db, newVersion);
+    if (oldVersion < 3) {
+      // Upgrading to version 3 (added jumlah_jiwa) - fallback to drop table for old versions
+      await db.execute('DROP TABLE IF EXISTS $tableTransactions');
+      await _onCreate(db, newVersion);
+    } else if (oldVersion == 3) {
+      // Safe migration for version 4 (added nomor_whatsapp)
+      await db.execute('ALTER TABLE $tableTransactions ADD COLUMN $columnNomorWhatsapp TEXT');
+    }
   }
 }

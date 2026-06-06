@@ -134,7 +134,7 @@ _Fokus: Membedah file UI yang terlalu bengkak (seperti `home_screen.dart`) menja
 - [x] **12.11 Refactor Form Provider:** Ekstraksi kalkulator zakat ke `ZakatCalculatorProvider`.
 - [x] **12.12 Keamanan Database (Security):** Obfuscation & abstraction layer untuk schema SQL.
 - [x] **12.13 Lingkungan Aman:** Implementasi `.env` & `flutter_dotenv` untuk menyembunyikan API/URL.
-- [ ] **12.14 Logika WA Dinamis:** Validasi nomor telepon Muzakki & kondisional tombol kirim struk.
+- [x] **12.14 Logika WA Dinamis:** Validasi nomor telepon Muzakki & kondisional tombol kirim struk.
 - [ ] **12.15 Optimasi Performa:** Implementasi `const` & `final` secara menyeluruh & perbaikan _memory leaks_.
 
 ## ⏳ FASE 13: Isolasi Data Pengguna (Multi-Tenancy Skala Enterprise)

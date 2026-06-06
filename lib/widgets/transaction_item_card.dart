@@ -51,7 +51,9 @@ class TransactionItemCard extends StatelessWidget {
         : 0.0;
 
     final String? phone = tx['phone']?.toString();
-    final bool hasPhone = phone != null && phone.isNotEmpty && phone != 'null';
+    // PERBAIKAN: Menambahkan pengecekan .trim() agar spasi kosong dihitung tidak ada
+    final bool hasPhone =
+        phone != null && phone.trim().isNotEmpty && phone != 'null';
 
     String displayDate = '';
     try {
@@ -77,11 +79,17 @@ class TransactionItemCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             onLongPress: () {
               if (hasPhone) {
-                onLongPress(tx, phone);
+                // PERBAIKAN: Operator (!) memastikan variabel phone dijamin tidak null saat diserahkan ke Callback
+                onLongPress(tx, phone!);
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Nomor WA Muzakki tidak tersedia.'),
+                    content: Text(
+                      'Nomor WA Muzakki tidak tersedia.',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    backgroundColor: Colors
+                        .redAccent, // PERBAIKAN: Memberikan warna peringatan yang tegas
                   ),
                 );
               }

@@ -79,6 +79,7 @@ class ZakatCalculatorNotifier extends Notifier<ZakatState> {
   Future<bool> saveTransaction({
     required String namaMuzakki,
     int? jumlahJiwa,
+    String? nomorWhatsapp,
   }) async {
     if (state.calculatedJumlah <= 0) return false;
 
@@ -95,6 +96,7 @@ class ZakatCalculatorNotifier extends Notifier<ZakatState> {
         SqliteService.columnJumlahJiwa: state.kategori == 'Fitrah'
             ? jumlahJiwa
             : null,
+        SqliteService.columnNomorWhatsapp: nomorWhatsapp,
         SqliteService.columnCreatedAt: DateTime.now().toIso8601String(),
         SqliteService.columnSyncStatus: 0,
       });

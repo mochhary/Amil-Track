@@ -38,6 +38,7 @@ class SyncService {
           'jumlah': record[SqliteService.columnJumlah],
           'tipe_satuan': record[SqliteService.columnTipeSatuan],
           'jumlah_jiwa': record[SqliteService.columnJumlahJiwa],
+          'nomor_whatsapp': record[SqliteService.columnNomorWhatsapp],
           'created_at': record[SqliteService.columnCreatedAt],
         });
 
@@ -85,6 +86,7 @@ class SyncService {
             SqliteService.columnJumlah: record['jumlah'],
             SqliteService.columnTipeSatuan: record['tipe_satuan'] ?? 'uang',
             SqliteService.columnJumlahJiwa: record['jumlah_jiwa'],
+            SqliteService.columnNomorWhatsapp: record['nomor_whatsapp'],
             SqliteService.columnCreatedAt: record['created_at'],
             SqliteService.columnSyncStatus: 1, // Langsung cap tersinkronisasi
           });

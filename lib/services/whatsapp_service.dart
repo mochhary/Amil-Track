@@ -10,7 +10,7 @@ class WhatsappService {
   // Mengubah format lokal (08xx) atau (+62xx) menjadi format internasional (62xx)
   // ============================================================================
   String? _parsePhoneNumber(String? phone) {
-    if (phone == null || phone.trim().isEmpty) return null;
+    if (phone == null || phone.trim().isEmpty || phone == 'null') return null;
 
     // Bersihkan semua karakter non-digital seperti spasi, strip, atau plus
     String cleaned = phone.replaceAll(RegExp(r'[^\d]'), '');
@@ -34,11 +34,12 @@ class WhatsappService {
   Future<void> sendKwitansi({
     required Map<String, dynamic> transaction,
     required String amilName,
+    String? phone, // DITAMBAHKAN: Menerima passing langsung dari UI
     required Function(String errorMessage) onError,
   }) async {
-    // Membaca kolom nomor telepon dari struktur SQLite/Supabase Anda
+    // Membaca kolom nomor telepon (prioritas dari parameter, lalu dari map)
     final String? rawPhone =
-        transaction['nomor_whatsapp'] ?? transaction['phone'];
+        phone ?? transaction['nomor_whatsapp'] ?? transaction['phone'];
     final String? validPhone = _parsePhoneNumber(rawPhone);
 
     // Proteksi 1: Validasi keberadaan nomor WhatsApp Muzakki
