@@ -133,7 +133,7 @@ _Fokus: Membedah file UI yang terlalu bengkak (seperti `home_screen.dart`) menja
 - [x] **12.10 Refactor List Provider:** Ekstraksi filter & pencarian ke `TransactionListProvider`.
 - [x] **12.11 Refactor Form Provider:** Ekstraksi kalkulator zakat ke `ZakatCalculatorProvider`.
 - [x] **12.12 Keamanan Database (Security):** Obfuscation & abstraction layer untuk schema SQL.
-- [ ] **12.13 Lingkungan Aman:** Implementasi `.env` & `flutter_dotenv` untuk menyembunyikan API/URL.
+- [x] **12.13 Lingkungan Aman:** Implementasi `.env` & `flutter_dotenv` untuk menyembunyikan API/URL.
 - [ ] **12.14 Logika WA Dinamis:** Validasi nomor telepon Muzakki & kondisional tombol kirim struk.
 - [ ] **12.15 Optimasi Performa:** Implementasi `const` & `final` secara menyeluruh & perbaikan _memory leaks_.
 

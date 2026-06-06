@@ -1,13 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AppConstants {
   const AppConstants._();
 
   static const String appName = 'Amil Track';
 
-  static const String supabaseUrl = 'https://ggutzfulufbqukxhlncv.supabase.co';
-  static const String supabaseAnonKey =
-      'sb_publishable_vLjhHdtqyJPD7ufX-S9PmA_Qt4ZDNJW';
+  static String get supabaseUrl => _requiredEnv('SUPABASE_URL');
+  static String get supabaseAnonKey => _requiredEnv('SUPABASE_ANON_KEY');
+
+  static String _requiredEnv(String key) {
+    final value = dotenv.env[key]?.trim();
+    if (value == null || value.isEmpty) {
+      throw StateError(
+        'Missing required environment variable: $key. '
+        'Please configure it in .env file.',
+      );
+    }
+    return value;
+  }
 }
 
 class AppColors {
