@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/constants.dart';
 import '../services/auth_service.dart';
+import '../services/sqlite_service.dart';
 import '../widgets/soft_surface_card.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -54,34 +56,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Future<void> _deleteAccount() async {
-    final confirmed = await showDialog<bool>(
+  void _showSecondDeleteConfirmation() {
+    final TextEditingController textController = TextEditingController();
+    bool isButtonEnabled = false;
+
+    showDialog(
       context: context,
-      builder: (ctx) {
-        var typedValue = '';
-
+      builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (context, setDialogState) {
-            final isMatch = typedValue.trim().toUpperCase() == 'HAPUS AKUN';
-
+          builder: (innerContext, setDialogState) {
             return AlertDialog(
-              title: const Text('Hapus akun?'),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: const Text('Konfirmasi Akhir'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const Text(
-                    'Tindakan ini bersifat permanen. Semua data yang terkait akan dihapus dari perangkat dan akun Anda akan ditutup.',
+                    'Ketik "Iya, Hapus akun saya" untuk melanjutkan penghapusan akun.',
                   ),
                   const SizedBox(height: 16),
                   TextField(
-                    autofocus: true,
+                    controller: textController,
                     decoration: const InputDecoration(
-                      labelText: 'Ketik HAPUS AKUN untuk melanjutkan',
+                      hintText: 'Iya, Hapus akun saya',
+                      border: OutlineInputBorder(),
                     ),
                     onChanged: (value) {
                       setDialogState(() {
-                        typedValue = value;
+                        isButtonEnabled = value == 'Iya, Hapus akun saya';
                       });
                     },
                   ),
@@ -89,12 +93,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(false),
+                  onPressed: () => Navigator.pop(dialogContext),
                   child: const Text('Batal'),
                 ),
                 ElevatedButton(
-                  onPressed: isMatch ? () => Navigator.of(ctx).pop(true) : null,
-                  child: const Text('Hapus'),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  onPressed: isButtonEnabled
+                      ? () async {
+                          Navigator.pop(dialogContext); // Close dialog
+                          if (!mounted) return;
+
+                          setState(() => _working = true);
+                          try {
+                            final supabase = Supabase.instance.client;
+                            final userId = supabase.auth.currentUser?.id;
+
+                            if (userId != null) {
+                              // 1. Hapus data di Supabase (Online)
+                              await supabase
+                                  .from('zakat_transactions')
+                                  .delete()
+                                  .eq('user_id', userId);
+
+                              // 2. Hapus data di SQLite (Lokal)
+                              final db = await SqliteService.instance.database;
+                              await db.delete(
+                                SqliteService.tableTransactions,
+                                where: 'user_id = ?',
+                                whereArgs: [userId],
+                              );
+                            }
+
+                            // 3. Eksekusi RPC hapus akun dan logout
+                            await supabase.rpc('delete_user');
+                            await supabase.auth.signOut();
+
+                            if (mounted) {
+                              Navigator.of(context).popUntil((r) => r.isFirst);
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Gagal menghapus akun: $e'),
+                                ),
+                              );
+                            }
+                          } finally {
+                            if (mounted) setState(() => _working = false);
+                          }
+                        }
+                      : null,
+                  child: const Text(
+                    'Hapus Akun',
+                    style: TextStyle(color: Colors.white),
+                  ),
                 ),
               ],
             );
@@ -102,24 +155,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
         );
       },
     );
+  }
 
-    if (confirmed != true) return;
-
-    setState(() => _working = true);
-    try {
-      await AuthService.instance.deleteAccount();
-      if (mounted) {
-        Navigator.of(context).popUntil((r) => r.isFirst);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Gagal menghapus akun: $e')));
-      }
-    } finally {
-      if (mounted) setState(() => _working = false);
-    }
+  void _showDeleteModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(28),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.warning_rounded, color: Colors.red, size: 48),
+            const SizedBox(height: 16),
+            const Text(
+              'Hapus Akun Permanen?',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Tindakan ini tidak bisa dibatalkan. Seluruh data lokal Anda akan dibersihkan.',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Batal'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                    ),
+                    onPressed: () {
+                      Navigator.pop(context); // Tutup bottom sheet
+                      _showSecondDeleteConfirmation();
+                    },
+                    child: const Text(
+                      'Hapus',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -188,7 +281,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       foregroundColor: Colors.red.shade700,
                       side: BorderSide(color: Colors.red.shade200),
                     ),
-                    onPressed: _working ? null : _deleteAccount,
+                    onPressed: _working ? null : _showDeleteModal,
                   ),
                 ],
               ),

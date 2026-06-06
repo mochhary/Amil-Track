@@ -76,4 +76,13 @@ class SqliteService {
       }
     }
   }
+
+  Future<void> clearUserData(String userId) async {
+    final db = await database;
+    await db.delete(
+      tableTransactions,
+      where: '$columnUserId = ?',
+      whereArgs: [userId],
+    );
+  }
 }

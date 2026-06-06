@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/constants.dart';
 import '../utils/dialog_utils.dart'; // IMPORT DIALOG UTILS BARU
+import '../services/sqlite_service.dart';
 import 'soft_surface_card.dart';
 import 'glass_container.dart';
 
@@ -32,12 +34,109 @@ class ProfileTabContent extends StatefulWidget {
 class _ProfileTabContentState extends State<ProfileTabContent> {
   bool _working = false;
 
+  void _showSecondDeleteConfirmation() {
+    final TextEditingController textController = TextEditingController();
+    bool isButtonEnabled = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (innerContext, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: const Text('Konfirmasi Akhir'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Ketik "Iya, Hapus akun saya" untuk melanjutkan penghapusan akun.',
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: textController,
+                    decoration: const InputDecoration(
+                      hintText: 'Iya, Hapus akun saya',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (value) {
+                      setDialogState(() {
+                        isButtonEnabled = value == 'Iya, Hapus akun saya';
+                      });
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Batal'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  onPressed: isButtonEnabled
+                      ? () async {
+                          Navigator.pop(dialogContext); // Tutup dialog
+                          if (!mounted) return;
+
+                          setState(() => _working = true);
+                          try {
+                            final supabase = Supabase.instance.client;
+                            final userId = supabase.auth.currentUser?.id;
+
+                            if (userId != null) {
+                              // 1. [Task 13.3] Hapus data di Supabase (Online)
+                              await supabase
+                                  .from('zakat_transactions')
+                                  .delete()
+                                  .eq('user_id', userId);
+
+                              // 2. [Task 13.3] Hapus data di SQLite (Lokal)
+                              final db = await SqliteService.instance.database;
+                              await db.delete(
+                                SqliteService.tableTransactions,
+                                where: 'user_id = ?',
+                                whereArgs: [userId],
+                              );
+                            }
+
+                            // 3. Eksekusi RPC Hapus Akun & Logout langsung (Riverpod akan urus navigasi)
+                            await supabase.rpc('delete_user');
+                            await supabase.auth.signOut();
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Gagal menghapus akun: $e'),
+                                ),
+                              );
+                            }
+                          } finally {
+                            if (mounted) setState(() => _working = false);
+                          }
+                        }
+                      : null,
+                  child: const Text(
+                    'Hapus Akun',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _showDeleteModal() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
+      builder: (modalContext) => Container(
         padding: const EdgeInsets.all(28),
         decoration: const BoxDecoration(
           color: Colors.white,
@@ -62,7 +161,7 @@ class _ProfileTabContentState extends State<ProfileTabContent> {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () => Navigator.pop(modalContext),
                     child: const Text('Batal'),
                   ),
                 ),
@@ -73,7 +172,8 @@ class _ProfileTabContentState extends State<ProfileTabContent> {
                       backgroundColor: Colors.red,
                     ),
                     onPressed: () {
-                      widget.onDeleteAccount();
+                      Navigator.pop(modalContext); // Tutup bottom sheet
+                      _showSecondDeleteConfirmation();
                     },
                     child: const Text(
                       'Hapus',

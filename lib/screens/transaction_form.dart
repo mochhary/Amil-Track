@@ -133,24 +133,19 @@ class _TransactionFormScreenState extends ConsumerState<TransactionFormScreen> {
   Widget _buildCategoryChip(String label, IconData icon, ZakatState state, ZakatCalculatorNotifier notifier) {
     final isSelected = state.kategori == label;
     return ChoiceChip(
-      label: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: 16,
-            color: isSelected ? Colors.white : AppColors.emeraldDeep,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              color: isSelected ? Colors.white : AppColors.textPrimary,
-            ),
-          ),
-        ],
+      showCheckmark: false,
+      avatar: Icon(
+        icon,
+        size: 18,
+        color: isSelected ? Colors.white : AppColors.emeraldDeep,
+      ),
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.bold,
+          color: isSelected ? Colors.white : AppColors.textPrimary,
+        ),
       ),
       selected: isSelected,
       selectedColor: AppColors.emeraldDeep,
@@ -168,6 +163,53 @@ class _TransactionFormScreenState extends ConsumerState<TransactionFormScreen> {
           _triggerCalculate();
         }
       },
+    );
+  }
+
+  Widget _buildSatuanCard(String title, String subtitle, IconData icon, String value, String groupValue, Function(String) onChanged) {
+    final isSelected = value == groupValue;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => onChanged(value),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.emeraldDeep.withValues(alpha: 0.1) : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? AppColors.emeraldDeep : AppColors.border,
+              width: isSelected ? 2 : 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(icon, color: isSelected ? AppColors.emeraldDeep : Colors.grey, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: isSelected ? AppColors.emeraldDeep : AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  if (isSelected)
+                    const Icon(Icons.check_circle_rounded, color: AppColors.emeraldDeep, size: 18),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                subtitle,
+                style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -302,47 +344,32 @@ class _TransactionFormScreenState extends ConsumerState<TransactionFormScreen> {
             if (zakatState.kategori == 'Fitrah') ...[
               Row(
                 children: [
-                  Expanded(
-                    child: RadioListTile<String>(
-                      title: const Text(
-                        'Beras (Kg)',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      value: 'beras',
-                      groupValue: zakatState.tipeSatuanFitrah,
-                      activeColor: AppColors.emeraldDeep,
-                      contentPadding: EdgeInsets.zero,
-                      onChanged: (val) {
-                        notifier.setTipeSatuanFitrah(val!);
-                        _triggerCalculate();
-                      },
-                    ),
+                  _buildSatuanCard(
+                    'Beras (Kg)',
+                    'Setara 2.5 kg atau 3.5 liter beras',
+                    Icons.rice_bowl_rounded,
+                    'beras',
+                    zakatState.tipeSatuanFitrah,
+                    (val) {
+                      notifier.setTipeSatuanFitrah(val);
+                      _triggerCalculate();
+                    },
                   ),
-                  Expanded(
-                    child: RadioListTile<String>(
-                      title: const Text(
-                        'Uang (Rp)',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      value: 'uang',
-                      groupValue: zakatState.tipeSatuanFitrah,
-                      activeColor: AppColors.emeraldDeep,
-                      contentPadding: EdgeInsets.zero,
-                      onChanged: (val) {
-                        notifier.setTipeSatuanFitrah(val!);
-                        _triggerCalculate();
-                      },
-                    ),
+                  const SizedBox(width: 12),
+                  _buildSatuanCard(
+                    'Uang (Rp)',
+                    'Sesuai SK BAZNAS daerah',
+                    Icons.payments_rounded,
+                    'uang',
+                    zakatState.tipeSatuanFitrah,
+                    (val) {
+                      notifier.setTipeSatuanFitrah(val);
+                      _triggerCalculate();
+                    },
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _jiwaController,
                 keyboardType: TextInputType.number,

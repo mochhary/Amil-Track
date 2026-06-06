@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'sqlite_service.dart';
 
 class AuthService {
   AuthService._();
@@ -29,10 +30,16 @@ class AuthService {
     final user = _client.auth.currentUser;
     if (user == null) throw Exception('User not authenticated');
 
-    try {
-      await _client.from('zakat_transactions').delete().eq('user_id', user.id);
-    } catch (_) {}
+    // Hapus data online dari Supabase
+    await _client.from('zakat_transactions').delete().eq('user_id', user.id);
+    
+    // Hapus pengaturan user dari Supabase (jika ada) - opsional, jika tidak ada relasi tabel pengaturan
+    // await _client.from('settings').delete().eq('user_id', user.id);
 
+    // Hapus data lokal dari SQLite
+    await SqliteService.instance.clearUserData(user.id);
+
+    // Logout
     await signOut();
   }
 
