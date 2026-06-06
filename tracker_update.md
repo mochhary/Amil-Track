@@ -103,16 +103,17 @@ _Fokus: Mengatasi potensi kerapuhan sistem (vulnerabilities) dan meningkatkan ef
 
 - [x] **Perbaikan Kerapuhan Visual (UI Responsiveness):** Mengganti angka _hardcoded_ (magic numbers) pada `_CustomLiquidNotchClipper` dan titik absolut penempatan elemen melayang (seperti FAB) dengan perhitungan matematis dinamis menggunakan `MediaQuery` atau `LayoutBuilder` agar UI tetap presisi di berbagai ukuran dan rasio layar (termasuk tablet).
 - [x] **Optimasi Efisiensi Query Database:** Melakukan refactoring pada fungsi `_loadDashboardData` yang saat ini menjalankan 7 query SQLite secara berurutan. Menggabungkan eksekusi menggunakan metode paralel `Future.wait([])` atau menyatukannya ke dalam satu agregasi query SQL kompleks untuk mencegah pelambatan performa (bottleneck) saat jumlah data transaksi mencapai ribuan.
-- [x] **Pemantauan Jaringan Efisien (Network Checking):** Mengganti metode `Timer.periodic` dan `InternetAddress.lookup` yang terus-menerus berjalan dan memakan daya baterai dengan *package* `connectivity_plus`. Pendekatan _event-driven_ ini akan memantau perubahan status koneksi perangkat secara pasif tanpa harus membebani _thread_ aplikasi.
-- [x] **Walkthrough ilang:** 
+- [x] **Pemantauan Jaringan Efisien (Network Checking):** Mengganti metode `Timer.periodic` dan `InternetAddress.lookup` yang terus-menerus berjalan dan memakan daya baterai dengan _package_ `connectivity_plus`. Pendekatan _event-driven_ ini akan memantau perubahan status koneksi perangkat secara pasif tanpa harus membebani _thread_ aplikasi.
+- [x] **Walkthrough ilang:**
 - [x] **Initial Cloud Pull (Two-Way Sync):** Membangun fungsi penyedot data awal yang otomatis mengunduh riwayat transaksi dari Supabase ke dalam SQLite lokal saat amil baru pertama kali login di perangkat baru.
+
 ---
 
 ## ⏳ FASE 11: Arsitektur Reaktif Dasar (Riverpod Integrasi Aman)
 
 _Fokus: Mengganti `setState` dengan Riverpod secara perlahan tanpa mengubah logika otentikasi (AuthService) maupun kredensial yang sudah terbukti berjalan lancar._
 
-- [x] **11.1 Instalasi & Setup ProviderScope:** Memasang *package* `flutter_riverpod` dan membungkus `MyApp` di `main.dart` tanpa menyentuh inisialisasi Supabase yang sudah ada di `core/constants.dart`.
+- [x] **11.1 Instalasi & Setup ProviderScope:** Memasang _package_ `flutter_riverpod` dan membungkus `MyApp` di `main.dart` tanpa menyentuh inisialisasi Supabase yang sudah ada di `core/constants.dart`.
 - [x] **11.2 Global Auth Provider:** Membuat `auth_provider.dart` murni untuk memantau status sesi pengguna saat ini, tanpa mengubah fungsi `signInWithOAuth` di `AuthService`.
 - [x] **11.3 Migrasi AuthGate:** Mengubah `AuthGate` di `main.dart` dari `StatefulWidget`/konvensional menjadi `ConsumerWidget` yang reaktif mendengarkan `auth_provider.dart`.
 
@@ -121,31 +122,41 @@ _Fokus: Mengganti `setState` dengan Riverpod secara perlahan tanpa mengubah logi
 _Fokus: Membedah file UI yang terlalu bengkak (seperti `home_screen.dart`) menjadi komponen kecil yang menggunakan Riverpod untuk mengambil datanya masing-masing._
 
 - [x] **12.1 Ekstraksi Logika Dashboard:** Membuat `dashboard_provider.dart` untuk memindahkan fungsi-fungsi berat (seperti mengambil total uang/beras dari SQLite) keluar dari UI.
-- [x] **12.2 Slicing Home Screen (Bagian Atas):** Memecah bagian *header* dan *hero card* (Kalkulator Zakat) menjadi *widget* terpisah di dalam folder `widgets/`.
-- [x] **12.3 Slicing Home Screen (Bagian Bawah):** Memecah *Grid Menu* dan *Recent Activity* menjadi komponen mandiri agar `home_screen.dart` menjadi sangat ringkas dan mudah dibaca.
-- [x] **12.4 Slicing Home Screen (Tab Profile):** 
-- [x] **12.5 Slicing Transaction List:** 
-- [x] **12.6 Slicing Transaction Form:** 
-- [x] **12.7 Refactoring Enterprise (Part 1):** Membuat `dialog_utils.dart` dan merombak `dashboard_provider.dart` untuk *caching* Riverpod.
+- [x] **12.2 Slicing Home Screen (Bagian Atas):** Memecah bagian _header_ dan _hero card_ (Kalkulator Zakat) menjadi _widget_ terpisah di dalam folder `widgets/`.
+- [x] **12.3 Slicing Home Screen (Bagian Bawah):** Memecah _Grid Menu_ dan _Recent Activity_ menjadi komponen mandiri agar `home_screen.dart` menjadi sangat ringkas dan mudah dibaca.
+- [x] **12.4 Slicing Home Screen (Tab Profile):**
+- [x] **12.5 Slicing Transaction List:**
+- [x] **12.6 Slicing Transaction Form:**
+- [x] **12.7 Refactoring Enterprise (Part 1):** Membuat `dialog_utils.dart` dan merombak `dashboard_provider.dart` untuk _caching_ Riverpod.
 - [x] **12.8 Integrasi Riverpod di Beranda:** Mengubah `HomeScreen` menjadi `ConsumerStatefulWidget` dan menggunakan `localDashboardProvider` untuk memuat data tanpa `setState`.
 - [x] **12.9 Implementasi Pusat Utilitas:** Memperbarui `action_grid.dart` dan `profile_tab_content.dart` agar menggunakan fungsi dari `DialogUtils` secara terpusat.
 - [x] **12.10 Refactor List Provider:** Ekstraksi filter & pencarian ke `TransactionListProvider`.
 - [x] **12.11 Refactor Form Provider:** Ekstraksi kalkulator zakat ke `ZakatCalculatorProvider`.
-- [ ] **12.12 Keamanan Database (Security):** Obfuscation & abstraction layer untuk schema SQL.
+- [x] **12.12 Keamanan Database (Security):** Obfuscation & abstraction layer untuk schema SQL.
 - [ ] **12.13 Lingkungan Aman:** Implementasi `.env` & `flutter_dotenv` untuk menyembunyikan API/URL.
 - [ ] **12.14 Logika WA Dinamis:** Validasi nomor telepon Muzakki & kondisional tombol kirim struk.
-- [ ] **12.15 Optimasi Performa:** Implementasi `const` & `final` secara menyeluruh & perbaikan *memory leaks*.
+- [ ] **12.15 Optimasi Performa:** Implementasi `const` & `final` secara menyeluruh & perbaikan _memory leaks_.
 
 ## ⏳ FASE 13: Isolasi Data Pengguna (Multi-Tenancy Skala Enterprise)
 
 _Fokus: Memastikan privasi dan keamanan data; Amil A tidak boleh bisa melihat, mengedit, atau menyinkronkan data transaksi milik Amil B._
 
 - [ ] **13.1 Modifikasi Skema SQLite Lokal:** Melakukan migrasi database di `sqlite_service.dart` untuk menambahkan kolom krusial `user_id` pada setiap baris transaksi yang dicatat.
-- [ ] **13.2 Filter Query & Restrukturisasi Auto-Sync:** Mengubah logika agregasi *dashboard* dan otak sinkronisasi (`sync_service.dart`) agar selalu mengunci data pada `WHERE user_id = current_user_id`.
+- [ ] **13.2 Filter Query & Restrukturisasi Auto-Sync:** Mengubah logika agregasi _dashboard_ dan otak sinkronisasi (`sync_service.dart`) agar selalu mengunci data pada `WHERE user_id = current_user_id`.
 
 ## ⏳ FASE 14: Keamanan Tingkat Lanjut & Native Login (Fase Ekspansi)
 
 _Fokus: Menerapkan keamanan tingkat rilis (Production) HANYA SETELAH seluruh UI dan State Management berjalan sempurna 100%._
 
 - [ ] **14.1 Isolasi API Key (.env):** Memasang package `flutter_dotenv` untuk menyembunyikan URL Supabase dan memindahkannya dari `constants.dart` dengan aman.
-- [ ] **14.2 Migrasi ke Native Google Sign-In:** Mengganti metode *browser* Supabase menjadi *pop-up* asli bawaan Android menggunakan Web Client ID (Dilakukan perlahan sambil memantau log *error* native).
+- [ ] **14.2 Migrasi ke Native Google Sign-In:** Mengganti metode _browser_ Supabase menjadi _pop-up_ asli bawaan Android menggunakan Web Client ID (Dilakukan perlahan sambil memantau log _error_ native).
+
+## 📝 FASE 15: Catatan Analisis Lanjutan (Deferred Backlog)
+
+_Fokus: Menyimpan catatan teknis hasil audit mendalam sebagai langkah berikutnya, namun belum menjadi target eksekusi fase aktif saat ini._
+
+- [ ] **15.1 Sinkronisasi Filter Tanggal List:** Menghubungkan `dateRange` pada UI riwayat transaksi ke logika `filteredTransactionsProvider` agar penyaringan tanggal benar-benar aktif di data.
+- [ ] **15.2 Konsistensi Alur WhatsApp Struk:** Menyelaraskan parameter nama/nomor pada `TransactionItemCard` dan `TransactionListScreen`, serta fallback kolom nomor (`nomor_whatsapp` / `phone`) agar validasi tombol kirim struk akurat.
+- [ ] **15.3 Persistensi Edit Profil ke Cloud:** Memastikan perubahan nama profil dari tab profil tidak hanya `setState` lokal, tetapi juga tersimpan ke Supabase metadata (`username`) dan otomatis sinkron ke sesi berjalan.
+- [ ] **15.4 Migrasi SQLite Tanpa Drop Table:** Refactor strategi `onUpgrade` database agar migrasi skema (mis. tambah kolom) tidak menghapus seluruh data lokal pengguna.
+- [ ] **15.5 Perbaikan tampilan Hero modal dan FAB:** Angka pada modal jadi tidak terlihat jelas karena terlalu banyak, harusnya jika banyak seperti itu hero bisa diklik untuk melihat detail uangnya secara jelas. dan juga FAB tampilannya kurang estetik karena terlalu jatuh dalam lekukan hapus saja lekukannya agar tetap estetik

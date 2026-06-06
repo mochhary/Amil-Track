@@ -1,21 +1,24 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
+import 'sqlite_schema.dart';
+
 class SqliteService {
   static const String databaseName = "amil_track.db";
   // FIX: Naik ke versi 3 untuk menambahkan kolom jumlah_jiwa
   static const int databaseVersion = 3;
 
-  static const String tableTransactions = 'local_transactions';
+  // Schema identifiers are exposed through a single abstraction gateway.
+  static String get tableTransactions => SqliteSchema.transactionsTable;
 
-  static const String columnId = 'id';
-  static const String columnNamaMuzakki = 'nama_muzakki';
-  static const String columnKategoriZakat = 'kategori_zakat';
-  static const String columnJumlah = 'jumlah';
-  static const String columnTipeSatuan = 'tipe_satuan';
-  static const String columnJumlahJiwa = 'jumlah_jiwa'; // KOLOM BARU
-  static const String columnCreatedAt = 'created_at';
-  static const String columnSyncStatus = 'sync_status';
+  static String get columnId => SqliteSchema.id;
+  static String get columnNamaMuzakki => SqliteSchema.namaMuzakki;
+  static String get columnKategoriZakat => SqliteSchema.kategoriZakat;
+  static String get columnJumlah => SqliteSchema.jumlah;
+  static String get columnTipeSatuan => SqliteSchema.tipeSatuan;
+  static String get columnJumlahJiwa => SqliteSchema.jumlahJiwa;
+  static String get columnCreatedAt => SqliteSchema.createdAt;
+  static String get columnSyncStatus => SqliteSchema.syncStatus;
 
   SqliteService._privateConstructor();
   static final SqliteService instance = SqliteService._privateConstructor();
