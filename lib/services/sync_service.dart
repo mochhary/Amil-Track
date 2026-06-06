@@ -21,14 +21,20 @@ class SyncService {
 
     try {
       final db = await SqliteService.instance.database;
+      final userId = _supabase.auth.currentUser?.id;
+
+      if (userId == null) {
+        _isSyncing = false;
+        return false;
+      }
 
       // --------------------------------------------------------
       // TAHAP 1: PUSH (Kirim Data Baru dari Lokal ke Cloud)
       // --------------------------------------------------------
       final pendingRecords = await db.query(
         SqliteService.tableTransactions,
-        where: '${SqliteService.columnSyncStatus} = ?',
-        whereArgs: [0],
+        where: '${SqliteService.columnSyncStatus} = ? AND ${SqliteService.columnUserId} = ?',
+        whereArgs: [0, userId],
       );
 
       for (var record in pendingRecords) {
@@ -39,6 +45,7 @@ class SyncService {
           'tipe_satuan': record[SqliteService.columnTipeSatuan],
           'jumlah_jiwa': record[SqliteService.columnJumlahJiwa],
           'nomor_whatsapp': record[SqliteService.columnNomorWhatsapp],
+          'user_id': userId, // Explicitly push user_id if needed
           'created_at': record[SqliteService.columnCreatedAt],
         });
 
@@ -53,9 +60,10 @@ class SyncService {
       // --------------------------------------------------------
       // TAHAP 2: PULL (Tarik Data Baru dari Cloud ke Lokal)
       // --------------------------------------------------------
-      // Cek kapan terakhir kali aplikasi kita menyimpan data
+      // Cek kapan terakhir kali aplikasi kita menyimpan data untuk user ini
       final maxDateRes = await db.rawQuery(
-        'SELECT MAX(${SqliteService.columnCreatedAt}) as max_date FROM ${SqliteService.tableTransactions}',
+        'SELECT MAX(${SqliteService.columnCreatedAt}) as max_date FROM ${SqliteService.tableTransactions} WHERE ${SqliteService.columnUserId} = ?',
+        [userId]
       );
       final String? latestLocalTime = maxDateRes.first['max_date'] as String?;
 
@@ -75,8 +83,8 @@ class SyncService {
         // Proteksi Lapis Baja: Pastikan data belum ada di SQLite sebelum disuntikkan
         final existing = await db.query(
           SqliteService.tableTransactions,
-          where: '${SqliteService.columnCreatedAt} = ?',
-          whereArgs: [record['created_at']],
+          where: '${SqliteService.columnCreatedAt} = ? AND ${SqliteService.columnUserId} = ?',
+          whereArgs: [record['created_at'], userId],
         );
 
         if (existing.isEmpty) {
@@ -87,6 +95,7 @@ class SyncService {
             SqliteService.columnTipeSatuan: record['tipe_satuan'] ?? 'uang',
             SqliteService.columnJumlahJiwa: record['jumlah_jiwa'],
             SqliteService.columnNomorWhatsapp: record['nomor_whatsapp'],
+            SqliteService.columnUserId: userId,
             SqliteService.columnCreatedAt: record['created_at'],
             SqliteService.columnSyncStatus: 1, // Langsung cap tersinkronisasi
           });

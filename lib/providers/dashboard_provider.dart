@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/sqlite_service.dart';
 
 // 1. Pindahkan class struktur data ke sini menjadi publik
@@ -40,6 +41,7 @@ class DashboardData {
 final localDashboardProvider = FutureProvider<DashboardData>((ref) async {
   final db = await SqliteService.instance.database;
   final todayStr = DateTime.now().toIso8601String().substring(0, 10);
+  final userId = Supabase.instance.client.auth.currentUser?.id ?? '';
 
   final String aggregateQuery =
       '''
@@ -58,12 +60,15 @@ final localDashboardProvider = FutureProvider<DashboardData>((ref) async {
       SUM(CASE WHEN ${SqliteService.columnCreatedAt} LIKE '$todayStr%' THEN 1 ELSE 0 END) as todayMuzakki,
       SUM(CASE WHEN ${SqliteService.columnTipeSatuan} = 'uang' AND ${SqliteService.columnCreatedAt} LIKE '$todayStr%' THEN ${SqliteService.columnJumlah} ELSE 0 END) as todayUang
     FROM ${SqliteService.tableTransactions}
+    WHERE ${SqliteService.columnUserId} = ?
   ''';
 
   final futures = await Future.wait([
-    db.rawQuery(aggregateQuery),
+    db.rawQuery(aggregateQuery, [userId]),
     db.query(
       SqliteService.tableTransactions,
+      where: '${SqliteService.columnUserId} = ?',
+      whereArgs: [userId],
       orderBy: '${SqliteService.columnCreatedAt} DESC',
       limit: 4,
     ),

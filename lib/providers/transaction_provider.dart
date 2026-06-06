@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/sqlite_service.dart';
 
 // 1. Filter Model
@@ -49,8 +50,11 @@ final rawTransactionsProvider = FutureProvider<List<Map<String, dynamic>>>((
   ref,
 ) async {
   final db = await SqliteService.instance.database;
+  final userId = Supabase.instance.client.auth.currentUser?.id ?? '';
   return await db.query(
     SqliteService.tableTransactions,
+    where: '${SqliteService.columnUserId} = ?',
+    whereArgs: [userId],
     orderBy: '${SqliteService.columnCreatedAt} DESC',
   );
 });

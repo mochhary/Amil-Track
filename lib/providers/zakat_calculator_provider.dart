@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/sqlite_service.dart';
 
 // 1. Model State untuk Form Zakat
@@ -83,6 +84,8 @@ class ZakatCalculatorNotifier extends Notifier<ZakatState> {
   }) async {
     if (state.calculatedJumlah <= 0) return false;
 
+    final userId = Supabase.instance.client.auth.currentUser?.id ?? '';
+
     state = state.copyWith(isSaving: true);
     try {
       final db = await SqliteService.instance.database;
@@ -97,6 +100,7 @@ class ZakatCalculatorNotifier extends Notifier<ZakatState> {
             ? jumlahJiwa
             : null,
         SqliteService.columnNomorWhatsapp: nomorWhatsapp,
+        SqliteService.columnUserId: userId,
         SqliteService.columnCreatedAt: DateTime.now().toIso8601String(),
         SqliteService.columnSyncStatus: 0,
       });

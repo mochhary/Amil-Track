@@ -141,8 +141,8 @@ _Fokus: Membedah file UI yang terlalu bengkak (seperti `home_screen.dart`) menja
 
 _Fokus: Memastikan privasi dan keamanan data; Amil A tidak boleh bisa melihat, mengedit, atau menyinkronkan data transaksi milik Amil B._
 
-- [ ] **13.1 Modifikasi Skema SQLite Lokal:** Melakukan migrasi database di `sqlite_service.dart` untuk menambahkan kolom krusial `user_id` pada setiap baris transaksi yang dicatat.
-- [ ] **13.2 Filter Query & Restrukturisasi Auto-Sync:** Mengubah logika agregasi _dashboard_ dan otak sinkronisasi (`sync_service.dart`) agar selalu mengunci data pada `WHERE user_id = current_user_id`.
+- [x] **13.1 Modifikasi Skema SQLite Lokal:** Melakukan migrasi database di `sqlite_service.dart` untuk menambahkan kolom krusial `user_id` pada setiap baris transaksi yang dicatat.
+- [x] **13.2 Filter Query & Restrukturisasi Auto-Sync:** Mengubah logika agregasi _dashboard_ dan otak sinkronisasi (`sync_service.dart`) agar selalu mengunci data pada `WHERE user_id = current_user_id`.
 
 ## ⏳ FASE 14: Keamanan Tingkat Lanjut & Native Login (Fase Ekspansi)
 
