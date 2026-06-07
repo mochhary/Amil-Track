@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/sqlite_service.dart';
+import 'dashboard_provider.dart';
+import 'transaction_provider.dart';
 
 // 1. Model State untuk Form Zakat
 class ZakatState {
@@ -105,6 +107,12 @@ class ZakatCalculatorNotifier extends Notifier<ZakatState> {
         SqliteService.columnSyncStatus: 0,
       });
       state = state.copyWith(isSaving: false);
+
+      // PERBAIKAN 12.14 & RIWAYAT: Beri sinyal ke Riverpod untuk otomatis memuat
+      // ulang layar Dashboard dan Riwayat Setoran agar data yang baru muncul!
+      ref.invalidate(localDashboardProvider);
+      ref.invalidate(rawTransactionsProvider);
+
       return true;
     } catch (e) {
       state = state.copyWith(isSaving: false);

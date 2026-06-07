@@ -50,8 +50,10 @@ class TransactionItemCard extends StatelessWidget {
         ? (tx[SqliteService.columnJumlah] as num).toDouble()
         : 0.0;
 
-    final String? phone = tx['phone']?.toString();
-    // PERBAIKAN: Menambahkan pengecekan .trim() agar spasi kosong dihitung tidak ada
+    // PERBAIKAN 12.14: Mengambil data nomor WA menggunakan kunci kolom yang benar dari SQLite/Supabase
+    final String? phone =
+        tx[SqliteService.columnNomorWhatsapp]?.toString() ??
+        tx['phone']?.toString();
     final bool hasPhone =
         phone != null && phone.trim().isNotEmpty && phone != 'null';
 
