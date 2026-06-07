@@ -355,8 +355,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final double navBarBottomSpacing = 24.0 + bottomPadding;
     final double fabSize = 58.0;
 
-    final double fabBottomPos =
-        navBarBottomSpacing + (navBarHeight / 2) - (fabSize / 2) + 12.0;
+    // FAB diposisikan secara estetik di atas navigasi agar terlihat lebih rapi
+    final double fabBottomPos = navBarBottomSpacing + 36.0;
     final double fabLeftPos = (screenSize.width / 2) - (fabSize / 2);
 
     final dashboardAsync = ref.watch(localDashboardProvider);
@@ -598,20 +598,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     child: Stack(
                       children: [
                         Positioned.fill(
-                          child: CustomPaint(
-                            painter: _CustomLiquidNotchPainter(
-                              radius: 32.0,
-                              color: Colors.transparent,
-                              notchRadius: 36.0,
-                            ),
-                          ),
-                        ),
-                        Positioned.fill(
-                          child: ClipPath(
-                            clipper: _NotchedRectangleClipper(
-                              radius: 32.0,
-                              notchRadius: 36.0,
-                            ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(32),
                             child: BackdropFilter(
                               filter: ImageFilter.blur(
                                 sigmaX: 30.0,
@@ -733,92 +721,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
     );
   }
-}
-
-class _NotchedRectangleClipper extends CustomClipper<Path> {
-  final double radius;
-  final double notchRadius;
-  _NotchedRectangleClipper({required this.radius, required this.notchRadius});
-  @override
-  Path getClip(Size size) => _calculateNotchedPath(size, radius, notchRadius);
-  @override
-  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
-}
-
-class _CustomLiquidNotchPainter extends CustomPainter {
-  final double radius;
-  final Color color;
-  final double notchRadius;
-  _CustomLiquidNotchPainter({
-    required this.radius,
-    required this.color,
-    required this.notchRadius,
-  });
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-    canvas.drawPath(_calculateNotchedPath(size, radius, notchRadius), paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-Path _calculateNotchedPath(Size size, double radius, double notchRadius) {
-  final path = Path();
-  final double w = size.width;
-  final double h = size.height;
-  final double center = w / 2;
-  final double notchDepth = h * 0.72;
-  final double curveSpread = notchRadius + (w * 0.02);
-  final double bezierTension = w * 0.015;
-
-  path.moveTo(radius, 0);
-  path.lineTo(center - curveSpread, 0);
-  path.cubicTo(
-    center - notchRadius,
-    0,
-    center - notchRadius + bezierTension,
-    notchDepth,
-    center,
-    notchDepth,
-  );
-  path.cubicTo(
-    center + notchRadius - bezierTension,
-    notchDepth,
-    center + notchRadius,
-    0,
-    center + curveSpread,
-    0,
-  );
-  path.lineTo(w - radius, 0);
-  path.arcToPoint(
-    Offset(w, radius),
-    radius: Radius.circular(radius),
-    clockwise: true,
-  );
-  path.lineTo(w, h - radius);
-  path.arcToPoint(
-    Offset(w - radius, h),
-    radius: Radius.circular(radius),
-    clockwise: true,
-  );
-  path.lineTo(radius, h);
-  path.arcToPoint(
-    Offset(0, h - radius),
-    radius: Radius.circular(radius),
-    clockwise: true,
-  );
-  path.lineTo(0, radius);
-  path.arcToPoint(
-    Offset(radius, 0),
-    radius: Radius.circular(radius),
-    clockwise: true,
-  );
-  path.close();
-  return path;
 }
 
 class _DistributionMiniChart extends StatelessWidget {

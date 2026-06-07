@@ -146,12 +146,11 @@ _Fokus: Memastikan privasi dan keamanan data; Amil A tidak boleh bisa melihat, m
 - [x] **13.3 Jika hapus akun, maka data lokal maupun online (supabase) hilang:**
 - [x] **13.4 hapus akun konfirmasinya 2 kali, jadi selain ada dialog konfirmasi dari bawah, ada juga konfirmasi modal ditengah seperti menginput "Iya, Hapus akun saya":**
 
-
 ## ⏳ FASE 14: Keamanan Tingkat Lanjut & Native Login (Fase Ekspansi)
 
 _Fokus: Menerapkan keamanan tingkat rilis (Production) HANYA SETELAH seluruh UI dan State Management berjalan sempurna 100%._
 
-- [ ] **14.1 Isolasi API Key (.env):** Memasang package `flutter_dotenv` untuk menyembunyikan URL Supabase dan memindahkannya dari `constants.dart` dengan aman.
+- [x] **14.1 Isolasi API Key (.env):** Memasang package `flutter_dotenv` untuk menyembunyikan URL Supabase dan memindahkannya dari `constants.dart` dengan aman.
 - [ ] **14.2 Migrasi ke Native Google Sign-In:** Mengganti metode _browser_ Supabase menjadi _pop-up_ asli bawaan Android menggunakan Web Client ID (Dilakukan perlahan sambil memantau log _error_ native).
 
 ## 📝 FASE 15: Catatan Analisis Lanjutan (Deferred Backlog)
